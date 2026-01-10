@@ -26,7 +26,15 @@ export interface SprintEvent {
   type: "design" | "coding" | "testing" | "review";
 }
 
+export interface AgentInsights {
+  profiler: string;
+  pulse: string;
+  forge: string;
+  gatekeeper: string;
+}
+
 export interface PhaseData {
+  agentInsights: AgentInsights | null;
   phase1: {
     completed: boolean;
     learningPaths: LearningPath[];
@@ -49,6 +57,7 @@ interface PhaseContextType {
   currentPhase: 1 | 2 | 3;
   phaseData: PhaseData;
   setCurrentPhase: (phase: 1 | 2 | 3) => void;
+  setAgentInsights: (insights: AgentInsights) => void;
   completePhase1: (paths: LearningPath[], selected: string[]) => void;
   completePhase2: (project: ProjectPRD) => void;
   completePhase3: (url: string) => void;
@@ -57,6 +66,7 @@ interface PhaseContextType {
 }
 
 const initialPhaseData: PhaseData = {
+  agentInsights: null,
   phase1: {
     completed: false,
     learningPaths: [],
@@ -80,6 +90,13 @@ const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 export const PhaseProvider = ({ children }: { children: ReactNode }) => {
   const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3>(1);
   const [phaseData, setPhaseData] = useState<PhaseData>(initialPhaseData);
+
+  const setAgentInsights = (insights: AgentInsights) => {
+    setPhaseData(prev => ({
+      ...prev,
+      agentInsights: insights,
+    }));
+  };
 
   const completePhase1 = (paths: LearningPath[], selected: string[]) => {
     setPhaseData(prev => ({
@@ -135,6 +152,7 @@ export const PhaseProvider = ({ children }: { children: ReactNode }) => {
         currentPhase,
         phaseData,
         setCurrentPhase,
+        setAgentInsights,
         completePhase1,
         completePhase2,
         completePhase3,

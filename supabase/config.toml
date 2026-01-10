@@ -1,1 +1,7 @@
 project_id = "zcyrclhoqtnyypqxruvg"
+
+[functions.career-agents]
+verify_jwt = false
+
+[functions.generate-phase-content]
+verify_jwt = false

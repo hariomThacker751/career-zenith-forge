@@ -471,7 +471,7 @@ const DiagnosticFlow = () => {
                 )}
                 {currentPhase === 3 && (
                   <motion.div key="phase3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <Phase3Launch />
+                    <Phase3Launch answers={answers} />
                   </motion.div>
                 )}
               </AnimatePresence>

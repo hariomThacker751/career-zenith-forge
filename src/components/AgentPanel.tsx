@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { User, TrendingUp, Hammer, Shield, CheckCircle2, Sparkles, Loader2, FileCheck, AlertTriangle, RefreshCw } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useResume } from "@/contexts/ResumeContext";
+import { usePhase, AgentInsights } from "@/contexts/PhaseContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -58,8 +59,9 @@ const agents: Agent[] = [
 
 const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
   const { resumeData } = useResume();
+  const { setAgentInsights } = usePhase();
   const { toast } = useToast();
-  const [agentInsights, setAgentInsights] = useState<Record<AgentType, string>>({} as Record<AgentType, string>);
+  const [agentInsights, setLocalAgentInsights] = useState<Record<AgentType, string>>({} as Record<AgentType, string>);
   const [processingAgents, setProcessingAgents] = useState<Set<AgentType>>(new Set());
   const [completedAgents, setCompletedAgents] = useState<Set<AgentType>>(new Set());
   const [failedAgents, setFailedAgents] = useState<Set<AgentType>>(new Set());
@@ -100,7 +102,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
     try {
       const insight = await analyzeWithAgent(agent.id);
       
-      setAgentInsights(prev => ({ ...prev, [agent.id]: insight }));
+      setLocalAgentInsights(prev => ({ ...prev, [agent.id]: insight }));
       setCompletedAgents(prev => new Set([...prev, agent.id]));
       setFailedAgents(prev => {
         const newSet = new Set(prev);
@@ -112,7 +114,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
       setFailedAgents(prev => new Set([...prev, agent.id]));
       
       // Set fallback insight
-      setAgentInsights(prev => ({
+      setLocalAgentInsights(prev => ({
         ...prev,
         [agent.id]: getFallbackInsight(agent.id, answers, resumeSkills, resumeProjects),
       }));
@@ -153,9 +155,17 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
 
   useEffect(() => {
     if (completedAgents.size === agents.length) {
+      // Save all insights to PhaseContext for use by Phase components
+      const insights: AgentInsights = {
+        profiler: agentInsights.profiler || "",
+        pulse: agentInsights.pulse || "",
+        forge: agentInsights.forge || "",
+        gatekeeper: agentInsights.gatekeeper || "",
+      };
+      setAgentInsights(insights);
       setTimeout(() => setAllComplete(true), 500);
     }
-  }, [completedAgents.size]);
+  }, [completedAgents.size, agentInsights, setAgentInsights]);
 
   return (
     <div className="space-y-4">
