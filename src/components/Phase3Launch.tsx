@@ -20,6 +20,8 @@ import {
   ListChecks,
   Youtube,
   Play,
+  Download,
+  Award,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -58,16 +60,20 @@ interface WeeklySprint {
   calendarEvent: CalendarEvent;
 }
 
+type SubmissionPhase = "IDLE" | "EVALUATING" | "SUCCESS";
+
 const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
   const { phaseData, completePhase3 } = usePhase();
   const { resumeData } = useResume();
   const [submissionUrl, setSubmissionUrl] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submissionPhase, setSubmissionPhase] = useState<SubmissionPhase>("IDLE");
   const [sprints, setSprints] = useState<WeeklySprint[]>([]);
   const [totalWeeks, setTotalWeeks] = useState(24);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedWeek, setExpandedWeek] = useState<number | null>(1);
+  const [currentEvalStep, setCurrentEvalStep] = useState(0);
+  const [completedWeeks, setCompletedWeeks] = useState<number[]>([]);
 
   const project = phaseData.phase2.project;
 
@@ -161,20 +167,52 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
     }
   };
 
+  const evaluationSteps = [
+    "Cloning Repository...",
+    "Analyzing week_8_deliverables...",
+    "Comparing against Industry Standards...",
+    "Evaluating code architecture...",
+    "Calculating final score...",
+  ];
+
+  // Handle evaluation step animation
+  useEffect(() => {
+    if (submissionPhase === "EVALUATING") {
+      setCurrentEvalStep(0);
+      const interval = setInterval(() => {
+        setCurrentEvalStep((prev) => {
+          if (prev >= evaluationSteps.length - 1) {
+            clearInterval(interval);
+            // Transition to SUCCESS after all steps
+            setTimeout(() => {
+              setSubmissionPhase("SUCCESS");
+              setCompletedWeeks((prev) => [...prev, 8]); // Mark W8 as completed
+              completePhase3(submissionUrl);
+              toast.success("Project submitted successfully! 🎉");
+            }, 800);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1200);
+      return () => clearInterval(interval);
+    }
+  }, [submissionPhase, completePhase3, submissionUrl]);
+
   const handleSubmit = () => {
-    if (!submissionUrl) {
-      toast.error("Please enter your project URL");
+    if (!submissionUrl || !submissionUrl.includes("github.com")) {
+      toast.error("Please enter a valid GitHub URL");
       return;
     }
 
-    completePhase3(submissionUrl);
-    setIsSubmitted(true);
-    toast.success("Project submitted successfully! 🎉");
+    setSubmissionPhase("EVALUATING");
   };
 
   const toggleWeek = (week: number) => {
     setExpandedWeek(expandedWeek === week ? null : week);
   };
+
+  const isWeekCompleted = (week: number) => completedWeeks.includes(week);
 
   return (
     <div className="space-y-6">
@@ -289,18 +327,37 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="glass-card overflow-hidden"
+                className={`glass-card overflow-hidden ${
+                  isWeekCompleted(sprint.week) ? "ring-2 ring-emerald-500/50" : ""
+                }`}
               >
                 {/* Week Header - Clickable */}
                 <button
                   onClick={() => toggleWeek(sprint.week)}
                   className="w-full p-4 flex items-center gap-4 hover:bg-white/5 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center font-bold text-primary border border-primary/20">
-                    W{sprint.week}
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold border ${
+                      isWeekCompleted(sprint.week)
+                        ? "bg-emerald-500 text-white border-emerald-500"
+                        : "bg-gradient-to-br from-primary/20 to-primary/5 text-primary border-primary/20"
+                    }`}
+                  >
+                    {isWeekCompleted(sprint.week) ? (
+                      <CheckCircle2 className="w-6 h-6" />
+                    ) : (
+                      `W${sprint.week}`
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-sm truncate">{sprint.theme}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm truncate">{sprint.theme}</h4>
+                      {isWeekCompleted(sprint.week) && (
+                        <span className="px-2 py-0.5 text-xs font-bold bg-emerald-500/20 text-emerald-500 rounded-full">
+                          Completed
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {sprint.knowledgeStack.length} resources • {sprint.forgeObjective.deliverables.length} deliverables
                     </p>
@@ -414,13 +471,14 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
             <span>Roadmap tailored to your project, skills, and learning style</span>
           </motion.div>
 
-          {/* Submission Portal */}
+          {/* Submission Portal - 3 State Machine */}
           <AnimatePresence mode="wait">
-            {!isSubmitted ? (
+            {submissionPhase === "IDLE" && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                key="idle"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                 className="glass-card p-6 space-y-4"
               >
                 <h3 className="font-bold flex items-center gap-2">
@@ -428,8 +486,8 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                   Submit Your Project
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Once you've completed your project, submit the GitHub repository or
-                  deployed URL below.
+                  Once you've completed your project, submit the GitHub repository URL below
+                  to initialize the AI evaluation.
                 </p>
 
                 <div className="flex gap-3">
@@ -445,42 +503,192 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                   <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                     <Button
                       onClick={handleSubmit}
+                      disabled={!submissionUrl.includes("github.com")}
                       className="gap-2 bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/25"
                     >
                       <Rocket className="w-4 h-4" />
-                      Submit
+                      Initialize AI Evaluation
                     </Button>
                   </motion.div>
                 </div>
               </motion.div>
-            ) : (
+            )}
+
+            {submissionPhase === "EVALUATING" && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="glass-card p-8 text-center space-y-4"
+                key="evaluating"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="glass-card overflow-hidden"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", delay: 0.2 }}
-                  className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary mx-auto flex items-center justify-center"
-                >
-                  <PartyPopper className="w-10 h-10 text-white" />
-                </motion.div>
-                <h3 className="text-2xl font-bold">
-                  <span className="text-gradient-emerald">Mission Complete!</span>
-                </h3>
-                <p className="text-muted-foreground">
-                  Your project has been submitted. You've completed all 3 phases of the
-                  Hackwell Career Execution Engine.
-                </p>
-                <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 inline-flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-primary" />
-                  <span className="font-mono text-sm">{submissionUrl}</span>
+                {/* Terminal Header */}
+                <div className="bg-slate-900 dark:bg-slate-950 px-4 py-3 flex items-center gap-2 border-b border-border/30">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
+                  </div>
+                  <span className="ml-2 text-sm text-slate-400 font-mono">
+                    hackwell-vibe-coder v2.0
+                  </span>
+                  <div className="ml-auto flex items-center gap-2 text-cyan-400 text-sm font-mono">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing...</span>
+                  </div>
+                </div>
+
+                {/* Terminal Content */}
+                <div className="bg-slate-900 dark:bg-slate-950 p-6 font-mono text-sm text-slate-100 space-y-4">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <span className="text-muted-foreground">$</span>
+                    <span>hackwell evaluate --repo {submissionUrl.split("/").slice(-1)[0]}</span>
+                  </div>
+
+                  <div className="bg-muted/10 rounded-lg p-4 border border-border/30 space-y-3">
+                    {evaluationSteps.map((step, index) => (
+                      <motion.div
+                        key={step}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{
+                          opacity: index <= currentEvalStep ? 1 : 0.3,
+                          x: 0,
+                        }}
+                        transition={{ delay: index * 0.1 }}
+                        className="flex items-center gap-3"
+                      >
+                        {index < currentEvalStep ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        ) : index === currentEvalStep ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                        ) : (
+                          <div className="w-4 h-4 rounded-full border border-muted-foreground/30" />
+                        )}
+                        <span
+                          className={
+                            index <= currentEvalStep
+                              ? "text-foreground/90"
+                              : "text-muted-foreground/50"
+                          }
+                        >
+                          {step}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Animated scan line */}
+                  <div className="h-1 bg-muted/20 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500"
+                      animate={{ x: ["-100%", "100%"] }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 1.5,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  </div>
                 </div>
               </motion.div>
             )}
+
+            {submissionPhase === "SUCCESS" && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                className="glass-card p-8 text-center space-y-6"
+              >
+                {/* Icon with gradient circle */}
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", delay: 0.2, stiffness: 200 }}
+                  className="w-24 h-24 rounded-full mx-auto flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, hsl(217 91% 60%), hsl(271 81% 56%))",
+                  }}
+                >
+                  <PartyPopper className="w-12 h-12 text-white" />
+                </motion.div>
+
+                {/* Heading */}
+                <motion.h3
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-3xl font-bold"
+                >
+                  <span className="text-gradient-emerald">Mission Complete!</span>
+                </motion.h3>
+
+                {/* Description */}
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-muted-foreground max-w-md mx-auto"
+                >
+                  Your project has been submitted. You've completed all 3 phases of the
+                  Hackwell Career Execution Engine.
+                </motion.p>
+
+                {/* Link Box - teal pill */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-emerald-500/10 border border-emerald-500/30"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  <span className="font-mono text-sm text-foreground">{submissionUrl}</span>
+                  <a
+                    href={submissionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </motion.div>
+
+                {/* Action Buttons */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4"
+                >
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-primary to-emerald-500 text-white shadow-lg shadow-primary/25"
+                  >
+                    <Download className="w-5 h-5" />
+                    Download Certificate
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <Award className="w-5 h-5" />
+                    View Achievement
+                  </Button>
+                </motion.div>
+              </motion.div>
+            )}
           </AnimatePresence>
+
+          {/* Footer */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center text-xs text-muted-foreground pt-4"
+          >
+            Hackwell — Mentorship-focused, technically rigorous, brutally honest.
+          </motion.p>
         </>
       )}
     </div>
