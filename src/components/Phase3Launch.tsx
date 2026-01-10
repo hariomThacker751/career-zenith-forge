@@ -95,6 +95,8 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
             techStack: project.techStack,
             difficulty: project.difficulty,
           },
+          targetCareer: phaseData.targetCareer,
+          exploreAnswers: phaseData.exploreAnswers,
         },
       });
 

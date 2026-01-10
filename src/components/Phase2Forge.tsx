@@ -52,6 +52,8 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
           resumeSkills: resumeData?.skills || [],
           resumeProjects: resumeData?.projects || [],
           selectedLearningPaths: phaseData.phase1.selectedPaths,
+          targetCareer: phaseData.targetCareer,
+          exploreAnswers: phaseData.exploreAnswers,
         },
       });
 

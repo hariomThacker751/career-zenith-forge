@@ -25,6 +25,8 @@ interface RequestData {
     techStack: string[];
     difficulty: string;
   };
+  targetCareer?: string; // From Explore Mode
+  exploreAnswers?: Record<string, string[]>; // Quiz answers from Explore Mode
 }
 
 const PHASE1_TOOL = {
@@ -159,7 +161,23 @@ const PHASE3_TOOL = {
 };
 
 function buildPhase1Prompt(data: RequestData): string {
+  const targetCareerSection = data.targetCareer 
+    ? `\n## TARGET CAREER (from Explore Mode): ${data.targetCareer}
+This user has already selected their target career. All learning paths MUST be specifically tailored to help them become a ${data.targetCareer}.`
+    : "";
+
+  const exploreContext = data.exploreAnswers
+    ? `\n## Explore Mode Quiz Answers:
+- Hobbies: ${data.exploreAnswers.hobbies?.join(", ") || "Not specified"}
+- Interests: ${data.exploreAnswers.interests?.join(", ") || "Not specified"}  
+- Current Skills: ${data.exploreAnswers.skills?.join(", ") || "Not specified"}
+- Branch/Major: ${data.exploreAnswers.branch?.join(", ") || "Not specified"}
+- Year: ${data.exploreAnswers.year?.join(", ") || "Not specified"}`
+    : "";
+
   return `You are an expert career advisor. Based on the following AI agent insights and user profile, generate 3-5 highly personalized learning paths to close skill gaps.
+${targetCareerSection}
+${exploreContext}
 
 ## Agent Insights:
 - PROFILER: ${data.agentInsights.profiler}
@@ -176,15 +194,22 @@ function buildPhase1Prompt(data: RequestData): string {
 - Past Projects: ${data.resumeProjects.join(", ") || "None"}
 
 ## Requirements:
-1. Each path should address a specific skill gap identified by the agents
+1. Each path should address a specific skill gap for ${data.targetCareer || "their goal"}
 2. Include real courses from platforms like Coursera, edX, Udemy, fast.ai, etc.
 3. Order by priority (most critical gap first)
 4. Consider their available time when setting durations
-5. Match difficulty to their current skill level`;
+5. Match difficulty to their current skill level
+6. ${data.targetCareer ? `FOCUS ALL PATHS on skills needed for ${data.targetCareer}` : "Focus on closing skill gaps identified by agents"}`;
 }
 
 function buildPhase2Prompt(data: RequestData): string {
+  const targetCareerSection = data.targetCareer 
+    ? `\n## TARGET CAREER: ${data.targetCareer}
+All projects MUST be specifically designed for someone pursuing a career as ${data.targetCareer}. The projects should directly build portfolio pieces relevant to ${data.targetCareer} roles.`
+    : "";
+
   return `You are THE FORGE - an expert project architect. Generate 2-3 high-impact, 2026-relevant project ideas.
+${targetCareerSection}
 
 ## Agent Insights:
 - FORGE: ${data.agentInsights.forge}
@@ -200,10 +225,10 @@ function buildPhase2Prompt(data: RequestData): string {
 
 ## Requirements:
 1. NO todo apps, weather apps, or basic CRUD - these are INDUSTRY projects
-2. Each project should solve a REAL problem
+2. Each project should solve a REAL problem ${data.targetCareer ? `relevant to ${data.targetCareer}` : ""}
 3. Include modern 2024-2026 tech stacks (AI, real-time, etc.)
 4. Projects should be completable in 4-8 weeks
-5. Include at least one AI/ML project if user showed interest
+5. ${data.targetCareer ? `Projects MUST be impressive for ${data.targetCareer} job applications` : "Include at least one AI/ML project if user showed interest"}
 6. Features should be specific and impressive for portfolio`;
 }
 
@@ -213,7 +238,13 @@ function buildPhase3Prompt(data: RequestData): string {
   const interest = data.answers[1] || "Web Development";
   const year = data.answers[0] || "2nd year";
   
+  const targetCareerSection = data.targetCareer 
+    ? `\n## TARGET CAREER: ${data.targetCareer}
+This roadmap is specifically for someone pursuing a career as ${data.targetCareer}. All learning resources and milestones should directly contribute to landing a job as ${data.targetCareer}.`
+    : "";
+
   return `You are THE HACKWELL DYNAMIC ORCHESTRATOR - the world's most advanced Career Intelligence Agent. Create a 6-month (24-week) learning roadmap using WEEKLY SPRINTS with THE BEST learning resources available.
+${targetCareerSection}
 
 ## Target Project:
 - Title: ${project?.title || "Unknown"}
@@ -227,7 +258,7 @@ function buildPhase3Prompt(data: RequestData): string {
 - Skill Level: ${skillLevel}
 - Available Hours/Week: ${data.answers[3] || "10-15 hours"}
 - Current Skills: ${data.resumeSkills?.join(", ") || "Not specified"}
-- Goal: ${data.answers[4] || "Build portfolio projects"}
+- Goal: ${data.targetCareer ? `Become a ${data.targetCareer}` : (data.answers[4] || "Build portfolio projects")}
 
 ## Agent Insights:
 - PROFILER: ${data.agentInsights.profiler}
