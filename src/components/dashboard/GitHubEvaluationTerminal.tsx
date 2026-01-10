@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Github,
@@ -63,15 +63,16 @@ export const GitHubEvaluationTerminal = ({
 
   const [currentScanMsg, setCurrentScanMsg] = useState(0);
 
-  // Cycle through scanning messages
-  useState(() => {
+  // Cycle through scanning messages when scanning
+  useEffect(() => {
     if (status === "scanning") {
+      setCurrentScanMsg(0);
       const interval = setInterval(() => {
         setCurrentScanMsg((prev) => (prev + 1) % scanningMessages.length);
       }, 1500);
       return () => clearInterval(interval);
     }
-  });
+  }, [status, scanningMessages.length]);
 
   return (
     <motion.div
@@ -80,19 +81,19 @@ export const GitHubEvaluationTerminal = ({
       className="bg-card border border-border/50 rounded-2xl overflow-hidden"
     >
       {/* Terminal Header */}
-      <div className="bg-[#0f172a] px-4 py-3 flex items-center gap-2 border-b border-border/30">
+      <div className="bg-slate-900 dark:bg-slate-950 px-4 py-3 flex items-center gap-2 border-b border-border/30">
         <div className="flex gap-1.5">
           <div className="w-3 h-3 rounded-full bg-red-500/80" />
           <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
           <div className="w-3 h-3 rounded-full bg-green-500/80" />
         </div>
-        <span className="ml-2 text-sm text-muted-foreground font-mono">
+        <span className="ml-2 text-sm text-slate-400 font-mono">
           github-evaluation-terminal
         </span>
       </div>
 
       {/* Terminal Content */}
-      <div className="bg-[#0f172a] p-6 font-mono text-sm">
+      <div className="bg-slate-900 dark:bg-slate-950 p-6 font-mono text-sm text-slate-100">
         <AnimatePresence mode="wait">
           {status === "idle" && (
             <motion.div
