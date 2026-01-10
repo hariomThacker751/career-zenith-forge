@@ -1,6 +1,7 @@
-import { motion } from "framer-motion";
-import { User, TrendingUp, Hammer, Shield, CheckCircle2, Sparkles, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { User, TrendingUp, Hammer, Shield, CheckCircle2, Sparkles, Loader2, FileCheck } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useResume } from "@/contexts/ResumeContext";
 
 interface AgentPanelProps {
   answers: Record<number, string>;
@@ -15,8 +16,13 @@ const agents = [
     gradient: "from-primary to-emerald-400",
     bgGradient: "from-primary/10 to-emerald-400/10",
     description: "Analyzing your Student Persona...",
-    getInsight: (answers: Record<number, string>) => {
+    getInsight: (answers: Record<number, string>, resumeSkills: string[]) => {
       const year = answers[0] || "";
+      const hasResume = resumeSkills.length > 0;
+      
+      if (hasResume && resumeSkills.length >= 10) {
+        return `Advanced profile detected with ${resumeSkills.length} skills. You're ready for Precision Path: Industry specialization and production-grade portfolio building.`;
+      }
       if (year.includes("1st") || year.includes("2nd")) {
         return "Foundation Path detected. Focus: CS Fundamentals, problem-solving mindset, and building your first real projects.";
       }
@@ -30,8 +36,17 @@ const agents = [
     gradient: "from-secondary to-indigo-400",
     bgGradient: "from-secondary/10 to-indigo-400/10",
     description: "Injecting 2026 industry trends...",
-    getInsight: (answers: Record<number, string>) => {
+    getInsight: (answers: Record<number, string>, resumeSkills: string[]) => {
       const interest = answers[1] || "";
+      
+      // Check for missing high-demand skills
+      const hotSkills2026 = ["TypeScript", "Rust", "Go", "Kubernetes", "LangChain", "PyTorch", "Next.js"];
+      const missingSkills = hotSkills2026.filter(s => !resumeSkills.includes(s));
+      
+      if (resumeSkills.length > 0 && missingSkills.length > 0) {
+        return `2026 Gap Analysis: Your resume is missing these trending skills: ${missingSkills.slice(0, 3).join(", ")}. These are highly demanded in the market right now.`;
+      }
+      
       if (interest.includes("AI")) {
         return "Hot roles: MLOps Engineer, Agentic AI Developer, AI Safety Researcher. Companies hiring: OpenAI, Anthropic, Google DeepMind.";
       }
@@ -51,9 +66,18 @@ const agents = [
     gradient: "from-amber-500 to-orange-400",
     bgGradient: "from-amber-500/10 to-orange-400/10",
     description: "Generating dynamic project...",
-    getInsight: (answers: Record<number, string>) => {
+    getInsight: (answers: Record<number, string>, resumeSkills: string[], resumeProjects: string[]) => {
       const level = answers[2] || "";
       const interest = answers[1] || "";
+      
+      // Check if user has already built common projects
+      const hasWebProjects = resumeProjects.some(p => 
+        p.toLowerCase().includes("website") || p.toLowerCase().includes("react") || p.toLowerCase().includes("full-stack")
+      );
+      
+      if (hasWebProjects && interest.includes("web")) {
+        return "Project: You've built web apps before. Level up with a Real-time AI-powered Code Review System with WebSocket collaboration and GPT-4 integration.";
+      }
       
       if (level.includes("loop") || level.includes("basic")) {
         return "Project: CLI-based Automated Study Scheduler with Pomodoro Analytics. Learn file I/O, data structures, and time management algorithms.";
@@ -74,8 +98,13 @@ const agents = [
     gradient: "from-rose-500 to-pink-400",
     bgGradient: "from-rose-500/10 to-pink-400/10",
     description: "Validating roadmap...",
-    getInsight: (answers: Record<number, string>) => {
+    getInsight: (answers: Record<number, string>, resumeSkills: string[]) => {
       const hours = answers[3] || "";
+      
+      if (resumeSkills.length > 0 && resumeSkills.length < 5) {
+        return "⚠️ Risk: Limited technical foundation. Recommendation: Spend 2 weeks on fundamentals before diving into advanced projects.";
+      }
+      
       if (hours.includes("5-10")) {
         return "⚠️ Risk: Slow progress may cause frustration. Recommendation: Focus on ONE skill deeply rather than spreading thin.";
       }
@@ -88,8 +117,12 @@ const agents = [
 ];
 
 const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
+  const { resumeData } = useResume();
   const [completedAgents, setCompletedAgents] = useState<Set<string>>(new Set());
   const [allComplete, setAllComplete] = useState(false);
+
+  const resumeSkills = resumeData?.skills || [];
+  const resumeProjects = resumeData?.projects || [];
 
   useEffect(() => {
     agents.forEach((agent, index) => {
@@ -117,8 +150,30 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
         <Sparkles className="w-5 h-5 text-secondary" />
       </motion.div>
       
+      {/* Resume sync indicator */}
+      {resumeData && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/5 border border-primary/20 mb-4"
+        >
+          <FileCheck className="w-4 h-4 text-primary" />
+          <span className="text-sm text-primary font-medium">
+            Resume data synchronized with all agents
+          </span>
+        </motion.div>
+      )}
+      
       {agents.map((agent, index) => {
         const isComplete = completedAgents.has(agent.id);
+        
+        // Get insight with resume data
+        let insight: string;
+        if (agent.id === "forge") {
+          insight = (agent.getInsight as (a: Record<number, string>, s: string[], p: string[]) => string)(answers, resumeSkills, resumeProjects);
+        } else {
+          insight = (agent.getInsight as (a: Record<number, string>, s: string[]) => string)(answers, resumeSkills);
+        }
         
         return (
           <motion.div
@@ -134,7 +189,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
                 animate={isComplete ? { scale: [1, 1.1, 1] } : {}}
                 transition={{ duration: 0.3 }}
               >
-                <agent.icon className={`w-5 h-5 bg-gradient-to-r ${agent.gradient} bg-clip-text`} style={{ color: 'hsl(var(--primary))' }} />
+                <agent.icon className="w-5 h-5 text-primary" />
               </motion.div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
@@ -159,7 +214,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
                   transition={{ duration: 0.3 }}
                 >
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {agent.getInsight(answers)}
+                    {insight}
                   </p>
                 </motion.div>
                 {!isComplete && (
@@ -195,8 +250,5 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
     </div>
   );
 };
-
-// Need to import AnimatePresence
-import { AnimatePresence } from "framer-motion";
 
 export default AgentPanel;

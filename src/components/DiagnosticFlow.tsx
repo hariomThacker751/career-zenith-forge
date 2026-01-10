@@ -9,12 +9,16 @@ import {
   ChevronRight,
   ChevronLeft,
   Sparkles,
-  Flame
+  Flame,
+  FileCheck,
+  Zap
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
 import RoadmapView from "./RoadmapView";
+import ResumeUpload from "./ResumeUpload";
 import { Button } from "./ui/button";
+import { useResume } from "@/contexts/ResumeContext";
 
 interface Question {
   id: number;
@@ -98,12 +102,13 @@ const questions: Question[] = [
   }
 ];
 
-type FlowState = "questions" | "analysis" | "roadmap";
+type FlowState = "resume" | "questions" | "analysis" | "roadmap";
 
 const DiagnosticFlow = () => {
+  const { resumeData } = useResume();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [flowState, setFlowState] = useState<FlowState>("questions");
+  const [flowState, setFlowState] = useState<FlowState>("resume");
 
   const handleSelect = (answer: string) => {
     setAnswers(prev => ({ ...prev, [currentStep]: answer }));
@@ -126,11 +131,15 @@ const DiagnosticFlow = () => {
   const handleReset = () => {
     setCurrentStep(0);
     setAnswers({});
-    setFlowState("questions");
+    setFlowState("resume");
   };
 
   const handleAnalysisComplete = () => {
     setFlowState("roadmap");
+  };
+
+  const handleStartDiagnostic = () => {
+    setFlowState("questions");
   };
 
   const currentQuestion = questions[currentStep];
@@ -150,10 +159,12 @@ const DiagnosticFlow = () => {
             className="pill-badge mb-4 mx-auto w-fit"
             whileHover={{ scale: 1.02 }}
           >
+            {flowState === "resume" && <Zap className="w-4 h-4 text-primary" />}
             {flowState === "questions" && <Sparkles className="w-4 h-4 text-primary" />}
             {flowState === "analysis" && <Flame className="w-4 h-4 text-orange-500" />}
             {flowState === "roadmap" && <Target className="w-4 h-4 text-primary" />}
             <span>
+              {flowState === "resume" && "Step 1: Upload Resume (Optional)"}
               {flowState === "questions" && `${answeredCount}/5 Questions Answered`}
               {flowState === "analysis" && "AI Analysis in Progress"}
               {flowState === "roadmap" && "Roadmap Ready"}
@@ -162,12 +173,14 @@ const DiagnosticFlow = () => {
           
           <h2 className="text-2xl md:text-3xl font-bold mb-3">
             <span className="text-gradient-sunset">
+              {flowState === "resume" && "Accelerate Your Analysis"}
               {flowState === "questions" && "Universal Diagnostic"}
               {flowState === "analysis" && "Analyzing Your Profile"}
               {flowState === "roadmap" && "Your Career Roadmap"}
             </span>
           </h2>
           <p className="text-muted-foreground">
+            {flowState === "resume" && "Upload your resume to let our AI agents personalize your roadmap"}
             {flowState === "questions" && "5 critical questions to determine your Career Velocity"}
             {flowState === "analysis" && "Multi-agent system processing your responses..."}
             {flowState === "roadmap" && "Personalized path to career dominance"}
@@ -175,6 +188,55 @@ const DiagnosticFlow = () => {
         </motion.div>
 
         <AnimatePresence mode="wait">
+          {flowState === "resume" && (
+            <motion.div
+              key="resume"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <ResumeUpload />
+              
+              {/* Resume synced indicator */}
+              {resumeData && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20"
+                >
+                  <FileCheck className="w-5 h-5 text-primary" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-primary">Resume Intelligence Active</p>
+                    <p className="text-xs text-muted-foreground">
+                      Agents will use your {resumeData.skills.length} detected skills to personalize recommendations
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+              
+              {/* Continue button */}
+              <div className="flex flex-col items-center gap-4 pt-4">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button
+                    onClick={handleStartDiagnostic}
+                    className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white shadow-lg shadow-primary/25 px-8 py-6 text-base"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    {resumeData ? "Continue with Resume Intelligence" : "Skip & Start Diagnostic"}
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </motion.div>
+                
+                {!resumeData && (
+                  <p className="text-xs text-muted-foreground">
+                    You can always upload your resume later
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+
           {flowState === "questions" && (
             <motion.div
               key="questions"
@@ -182,6 +244,18 @@ const DiagnosticFlow = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
+              {/* Resume mini badge if uploaded */}
+              {resumeData && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 mb-6 w-fit mx-auto"
+                >
+                  <FileCheck className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-medium text-primary">Resume Synced: {resumeData.fileName}</span>
+                </motion.div>
+              )}
+              
               {/* XP-style Progress bar */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-2">
