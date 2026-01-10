@@ -11,14 +11,20 @@ import {
   Sparkles,
   Flame,
   FileCheck,
-  Zap
+  Zap,
+  AlertTriangle
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
-import RoadmapView from "./RoadmapView";
 import ResumeUpload from "./ResumeUpload";
+import ManualReconMode from "./ManualReconMode";
+import PhaseIndicator from "./PhaseIndicator";
+import Phase1Foundation from "./Phase1Foundation";
+import Phase2Forge from "./Phase2Forge";
+import Phase3Launch from "./Phase3Launch";
 import { Button } from "./ui/button";
 import { useResume } from "@/contexts/ResumeContext";
+import { usePhase } from "@/contexts/PhaseContext";
 
 interface Question {
   id: number;
@@ -102,13 +108,15 @@ const questions: Question[] = [
   }
 ];
 
-type FlowState = "resume" | "questions" | "analysis" | "roadmap";
+type FlowState = "resume" | "manual-recon" | "questions" | "analysis" | "phases";
 
 const DiagnosticFlow = () => {
   const { resumeData } = useResume();
+  const { currentPhase, resetPhases } = usePhase();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [flowState, setFlowState] = useState<FlowState>("resume");
+  const [parseError, setParseError] = useState(false);
 
   const handleSelect = (answer: string) => {
     setAnswers(prev => ({ ...prev, [currentStep]: answer }));
@@ -132,14 +140,25 @@ const DiagnosticFlow = () => {
     setCurrentStep(0);
     setAnswers({});
     setFlowState("resume");
+    setParseError(false);
+    resetPhases();
   };
 
   const handleAnalysisComplete = () => {
-    setFlowState("roadmap");
+    setFlowState("phases");
   };
 
   const handleStartDiagnostic = () => {
     setFlowState("questions");
+  };
+
+  const handleManualReconComplete = () => {
+    setFlowState("questions");
+  };
+
+  const handleTriggerManualRecon = () => {
+    setParseError(true);
+    setFlowState("manual-recon");
   };
 
   const currentQuestion = questions[currentStep];
@@ -402,15 +421,46 @@ const DiagnosticFlow = () => {
             </motion.div>
           )}
 
-          {flowState === "roadmap" && (
+          {flowState === "manual-recon" && (
             <motion.div
-              key="roadmap"
+              key="manual-recon"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <ManualReconMode onComplete={handleManualReconComplete} />
+            </motion.div>
+          )}
+
+          {flowState === "phases" && (
+            <motion.div
+              key="phases"
               initial={{ opacity: 0, y: 40, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+              className="space-y-8"
             >
-              <RoadmapView answers={answers} onReset={handleReset} />
+              <PhaseIndicator />
+              
+              <AnimatePresence mode="wait">
+                {currentPhase === 1 && (
+                  <motion.div key="phase1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <Phase1Foundation answers={answers} />
+                  </motion.div>
+                )}
+                {currentPhase === 2 && (
+                  <motion.div key="phase2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <Phase2Forge answers={answers} />
+                  </motion.div>
+                )}
+                {currentPhase === 3 && (
+                  <motion.div key="phase3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <Phase3Launch />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
