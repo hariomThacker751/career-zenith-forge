@@ -181,12 +181,14 @@ const DiagnosticFlow = () => {
             {flowState === "resume" && <Zap className="w-4 h-4 text-primary" />}
             {flowState === "questions" && <Sparkles className="w-4 h-4 text-primary" />}
             {flowState === "analysis" && <Flame className="w-4 h-4 text-orange-500" />}
-            {flowState === "roadmap" && <Target className="w-4 h-4 text-primary" />}
+            {flowState === "manual-recon" && <AlertTriangle className="w-4 h-4 text-amber-500" />}
+            {flowState === "phases" && <Target className="w-4 h-4 text-primary" />}
             <span>
               {flowState === "resume" && "Step 1: Upload Resume (Optional)"}
               {flowState === "questions" && `${answeredCount}/5 Questions Answered`}
               {flowState === "analysis" && "AI Analysis in Progress"}
-              {flowState === "roadmap" && "Roadmap Ready"}
+              {flowState === "manual-recon" && "Manual Recon Mode"}
+              {flowState === "phases" && "Execution Engine Active"}
             </span>
           </motion.div>
           
@@ -195,14 +197,16 @@ const DiagnosticFlow = () => {
               {flowState === "resume" && "Accelerate Your Analysis"}
               {flowState === "questions" && "Universal Diagnostic"}
               {flowState === "analysis" && "Analyzing Your Profile"}
-              {flowState === "roadmap" && "Your Career Roadmap"}
+              {flowState === "manual-recon" && "Build Your Profile"}
+              {flowState === "phases" && "3-Phase Execution"}
             </span>
           </h2>
           <p className="text-muted-foreground">
             {flowState === "resume" && "Upload your resume to let our AI agents personalize your roadmap"}
             {flowState === "questions" && "5 critical questions to determine your Career Velocity"}
             {flowState === "analysis" && "Multi-agent system processing your responses..."}
-            {flowState === "roadmap" && "Personalized path to career dominance"}
+            {flowState === "manual-recon" && "Answer a few questions to unlock your roadmap"}
+            {flowState === "phases" && "Foundation → Forge → Launch"}
           </p>
         </motion.div>
 
