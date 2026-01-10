@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GlobalProgressHeader } from "./GlobalProgressHeader";
-import { ActiveSprintTracker } from "./ActiveSprintTracker";
+import { WeeklyMissionCard } from "./WeeklyMissionCard";
 import { ActivityFeed } from "./ActivityFeed";
-import { GitHubEvaluationTerminal } from "./GitHubEvaluationTerminal";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { Loader2, AlertCircle, Coins } from "lucide-react";
+import { Loader2, AlertCircle, Coins, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 // Demo data for when no user is authenticated
 const demoTasks = [
-  { id: "1", title: "Complete TypeScript fundamentals course", is_completed: false, sprint_id: "demo", sort_order: 0, created_at: new Date().toISOString(), completed_at: null, description: null },
-  { id: "2", title: "Build a REST API with Express", is_completed: false, sprint_id: "demo", sort_order: 1, created_at: new Date().toISOString(), completed_at: null, description: null },
-  { id: "3", title: "Implement authentication system", is_completed: false, sprint_id: "demo", sort_order: 2, created_at: new Date().toISOString(), completed_at: null, description: null },
-  { id: "4", title: "Write unit tests for core functions", is_completed: false, sprint_id: "demo", sort_order: 3, created_at: new Date().toISOString(), completed_at: null, description: null },
-  { id: "5", title: "Deploy to production environment", is_completed: false, sprint_id: "demo", sort_order: 4, created_at: new Date().toISOString(), completed_at: null, description: null },
+  { id: "1", title: "Complete TypeScript fundamentals course", is_completed: false, sprint_id: "demo", sort_order: 0, created_at: new Date().toISOString(), completed_at: null, description: "Master the basics of TypeScript including types, interfaces, and generics" },
+  { id: "2", title: "Build a REST API with Express", is_completed: false, sprint_id: "demo", sort_order: 1, created_at: new Date().toISOString(), completed_at: null, description: "Create a fully functional REST API with proper error handling" },
+  { id: "3", title: "Implement authentication system", is_completed: false, sprint_id: "demo", sort_order: 2, created_at: new Date().toISOString(), completed_at: null, description: "Add JWT-based authentication with refresh tokens" },
+  { id: "4", title: "Write unit tests for core functions", is_completed: false, sprint_id: "demo", sort_order: 3, created_at: new Date().toISOString(), completed_at: null, description: "Achieve 80%+ test coverage on business logic" },
+  { id: "5", title: "Deploy to production environment", is_completed: false, sprint_id: "demo", sort_order: 4, created_at: new Date().toISOString(), completed_at: null, description: "Deploy using CI/CD pipeline with environment variables" },
 ];
 
 const demoActivities = [
@@ -37,7 +37,6 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
     isLoading,
     error,
     toggleTask,
-    submitForReview,
     submitProject,
     unlockNextWeek,
   } = useDashboardData(userId);
@@ -46,7 +45,6 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
   const [demoTasksState, setDemoTasksState] = useState(demoTasks);
   const [demoPhase, setDemoPhase] = useState(1);
   const [demoWeek, setDemoWeek] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isDemo = !userId;
   
@@ -76,43 +74,32 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
     }
   };
 
-  // Submit for review handler
-  const handleSubmitForReview = async () => {
-    setIsSubmitting(true);
+  // GitHub submit handler with enhanced demo
+  const handleSubmitRepo = async (url: string) => {
     if (isDemo) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    } else {
-      await submitForReview();
-    }
-    setIsSubmitting(false);
-  };
-
-  // GitHub submit handler
-  const handleGitHubSubmit = async (url: string) => {
-    if (isDemo) {
-      // Enhanced demo evaluation with AI-like feedback
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const passed = Math.random() > 0.25;
-      const score = passed ? Math.floor(Math.random() * 15) + 78 : Math.floor(Math.random() * 25) + 45;
+      // Simulate AI evaluation with realistic delay
+      await new Promise(resolve => setTimeout(resolve, 7000));
+      const passed = Math.random() > 0.2; // 80% pass rate in demo
+      const score = passed ? Math.floor(Math.random() * 15) + 78 : Math.floor(Math.random() * 20) + 50;
       
       return {
         passed,
         score,
         feedback: passed
-          ? "Great job! Your implementation demonstrates solid understanding of the week's concepts."
-          : "Good progress, but there are key areas that need attention before moving forward.",
+          ? "Excellent work! Your implementation demonstrates strong understanding of the week's concepts and follows industry best practices."
+          : "Good progress, but there are key areas that need attention before moving forward. Review the feedback below.",
         strengths: passed ? [
-          "Clean code structure with good separation of concerns",
-          "Proper use of TypeScript types throughout the project",
-          "Well-documented functions with clear naming conventions",
-          "Effective error handling patterns implemented",
+          "Clean code structure with proper separation of concerns",
+          "Effective use of TypeScript types for type safety",
+          "Well-documented functions with clear naming",
+          "Proper error handling patterns",
         ] : [
           "Good attempt at implementing core functionality",
           "Basic project structure is in place",
         ],
         improvements: passed ? [
           "Consider adding more comprehensive unit tests",
-          "Some functions could be broken down into smaller pieces",
+          "Some functions could benefit from additional documentation",
         ] : [
           "Error handling needs to be more robust",
           "Add input validation for user-facing functions",
@@ -120,14 +107,14 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
           "Consider using more descriptive variable names",
         ],
         codeQuality: {
-          structure: passed ? Math.floor(Math.random() * 15) + 80 : Math.floor(Math.random() * 20) + 50,
-          readability: passed ? Math.floor(Math.random() * 12) + 82 : Math.floor(Math.random() * 25) + 55,
-          bestPractices: passed ? Math.floor(Math.random() * 10) + 78 : Math.floor(Math.random() * 20) + 48,
-          documentation: passed ? Math.floor(Math.random() * 18) + 70 : Math.floor(Math.random() * 30) + 40,
+          structure: passed ? Math.floor(Math.random() * 12) + 82 : Math.floor(Math.random() * 20) + 55,
+          readability: passed ? Math.floor(Math.random() * 10) + 85 : Math.floor(Math.random() * 18) + 58,
+          bestPractices: passed ? Math.floor(Math.random() * 8) + 80 : Math.floor(Math.random() * 22) + 50,
+          documentation: passed ? Math.floor(Math.random() * 15) + 75 : Math.floor(Math.random() * 25) + 45,
         },
         professionalReview: passed
-          ? `This submission shows strong foundational skills and attention to detail. The code organization follows industry-standard patterns, and the implementation demonstrates a good grasp of the concepts covered this week.\n\nI particularly appreciated the consistent coding style and the effort put into making the code readable. The use of TypeScript is effective, though there's room to leverage more advanced type features in future iterations.\n\nFor next week, I'd recommend exploring testing strategies and continuous integration practices to further strengthen your development workflow.`
-          : `While this submission shows effort and understanding of the basic concepts, there are several areas that need improvement before moving forward.\n\nThe main concerns are around code robustness - specifically error handling and edge case management. Production code needs to gracefully handle unexpected inputs and failure scenarios.\n\nI'd suggest revisiting the course materials on defensive programming and adding comprehensive error boundaries before resubmitting.`,
+          ? `Outstanding submission for Week ${currentWeek}! Your code demonstrates mature engineering practices and attention to detail.\n\nThe architecture choices are solid, and I can see you've put thought into maintainability. The TypeScript usage is effective, though there's room to leverage more advanced type features.\n\nFor next week, I'd recommend exploring testing strategies and continuous integration to further strengthen your development workflow. Keep up the excellent work!`
+          : `This submission shows effort and understanding of the basic concepts, but there are several areas that need improvement before advancing.\n\nThe main concerns are around code robustness - specifically error handling and edge case management. Production code needs to gracefully handle unexpected inputs.\n\nI'd suggest revisiting the course materials on defensive programming and adding comprehensive error boundaries before resubmitting. You're on the right track!`,
       };
     }
     return submitProject(url);
@@ -186,96 +173,105 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Demo Banner */}
-        <AnimatePresence>
-          {isDemo && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">Demo Mode</p>
-                  <p className="text-xs text-muted-foreground">Sign in to track your real progress</p>
-                </div>
-              </div>
-              <Button size="sm" className="bg-primary hover:bg-primary/90">
-                Sign In
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Credits Display */}
-        {!isDemo && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex justify-end"
-          >
-            <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl px-4 py-2 flex items-center gap-2">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Navigation */}
+      <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">Back to Home</span>
+          </Link>
+          
+          {!isDemo && (
+            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
               <Coins className="w-4 h-4 text-amber-400" />
               <span className="text-sm font-semibold text-foreground">{credits}</span>
               <span className="text-xs text-muted-foreground">credits</span>
             </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Demo Banner */}
+          <AnimatePresence>
+            {isDemo && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                    <AlertCircle className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Demo Mode Active</p>
+                    <p className="text-xs text-muted-foreground">Complete tasks and submit a repo to see the AI evaluation flow</p>
+                  </div>
+                </div>
+                <Button size="sm" className="bg-primary hover:bg-primary/90">
+                  Sign In
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Global Progress Header */}
+          <GlobalProgressHeader
+            currentPhase={currentPhase}
+            currentWeek={currentWeek}
+            completionPercentage={completionPercentage}
+          />
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Weekly Mission */}
+            <div className="lg:col-span-2">
+              <WeeklyMissionCard
+                weekNumber={currentWeek}
+                theme={sprintTheme}
+                tasks={displayTasks.map(t => ({
+                  id: t.id,
+                  title: t.title,
+                  description: t.description || undefined,
+                  isCompleted: t.is_completed || false,
+                }))}
+                onTaskToggle={handleTaskToggle}
+                onSubmitRepo={handleSubmitRepo}
+                onNextWeek={handleNextWeek}
+                isDemo={isDemo}
+              />
+            </div>
+
+            {/* Right Column - Activity Feed */}
+            <div className="lg:col-span-1">
+              <ActivityFeed
+                userId={userId}
+                activities={displayActivities.map(a => ({
+                  id: a.id,
+                  agent_type: a.agent_type as "system" | "profiler" | "pulse" | "forge" | "gatekeeper",
+                  message: a.message,
+                  created_at: a.created_at,
+                  metadata: a.metadata as Record<string, any> | undefined,
+                }))}
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center py-8 border-t border-border/30"
+          >
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold">Hackwell</span> — Mentorship-focused, technically rigorous, brutally honest.
+            </p>
           </motion.div>
-        )}
-
-        {/* Global Progress Header */}
-        <GlobalProgressHeader
-          currentPhase={currentPhase}
-          currentWeek={currentWeek}
-          completionPercentage={completionPercentage}
-        />
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Active Sprint */}
-          <div className="lg:col-span-2 space-y-6">
-            <ActiveSprintTracker
-              weekNumber={currentWeek}
-              theme={sprintTheme}
-              tasks={displayTasks.map(t => ({
-                id: t.id,
-                title: t.title,
-                description: t.description || undefined,
-                isCompleted: t.is_completed || false,
-              }))}
-              onTaskToggle={handleTaskToggle}
-              onSubmitForReview={handleSubmitForReview}
-              isSubmitting={isSubmitting}
-            />
-
-            {/* GitHub Evaluation Terminal */}
-            <GitHubEvaluationTerminal
-              onSubmit={handleGitHubSubmit}
-              onNextWeek={handleNextWeek}
-              weekNumber={currentWeek}
-              weekTheme={sprintTheme}
-              tasks={displayTasks.map(t => t.title)}
-            />
-          </div>
-
-          {/* Right Column - Activity Feed */}
-          <div className="lg:col-span-1">
-            <ActivityFeed
-              userId={userId}
-              activities={displayActivities.map(a => ({
-                id: a.id,
-                agent_type: a.agent_type as "system" | "profiler" | "pulse" | "forge" | "gatekeeper",
-                message: a.message,
-                created_at: a.created_at,
-                metadata: a.metadata as Record<string, any> | undefined,
-              }))}
-            />
-          </div>
         </div>
       </div>
     </div>
