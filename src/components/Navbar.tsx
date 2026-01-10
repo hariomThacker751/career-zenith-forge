@@ -1,19 +1,26 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Shield } from "lucide-react";
+import { Menu, X, Shield, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   const navLinks = [
     { name: "Features", href: "#features" },
     { name: "Roadmap", href: "#roadmap" },
     { name: "About", href: "#about" },
+    { name: "Dashboard", href: "/dashboard", isRoute: true },
   ];
 
-  const scrollToSection = (href: string) => {
+  const scrollToSection = (href: string, isRoute?: boolean) => {
     setIsMenuOpen(false);
+    if (isRoute) {
+      navigate(href);
+      return;
+    }
     const element = document.querySelector(href);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -49,9 +56,12 @@ const Navbar = () => {
             {navLinks.map((link) => (
               <button
                 key={link.name}
-                onClick={() => scrollToSection(link.href)}
-                className="text-muted-foreground hover:text-foreground font-medium transition-colors duration-200 relative group"
+                onClick={() => scrollToSection(link.href, link.isRoute)}
+                className={`text-muted-foreground hover:text-foreground font-medium transition-colors duration-200 relative group ${
+                  link.isRoute ? "flex items-center gap-1.5" : ""
+                }`}
               >
+                {link.isRoute && <LayoutDashboard className="w-4 h-4" />}
                 {link.name}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-teal-500 transition-all duration-300 group-hover:w-full" />
               </button>
@@ -66,6 +76,7 @@ const Navbar = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Button 
+              onClick={() => navigate("/dashboard")}
               className="bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-semibold px-6 shadow-lg shadow-teal-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-teal-500/30"
             >
               Get Started
@@ -104,19 +115,21 @@ const Navbar = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  onClick={() => scrollToSection(link.href)}
-                  className="block w-full text-left py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
+                  onClick={() => scrollToSection(link.href, link.isRoute)}
+                  className="flex items-center gap-2 w-full text-left py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
                 >
+                  {link.isRoute && <LayoutDashboard className="w-4 h-4" />}
                   {link.name}
                 </motion.button>
               ))}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.4 }}
                 className="pt-2"
               >
                 <Button 
+                  onClick={() => navigate("/dashboard")}
                   className="w-full bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-semibold shadow-lg"
                 >
                   Get Started
