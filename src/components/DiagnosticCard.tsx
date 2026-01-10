@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 
 interface DiagnosticCardProps {
   icon: React.ReactNode;
@@ -21,14 +21,19 @@ const DiagnosticCard = ({
   onSelect,
 }: DiagnosticCardProps) => {
   return (
-    <div className="glass-card border-glow p-6 md:p-8">
+    <div className="card-elevated p-6 md:p-8">
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+        <motion.div 
+          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center text-primary flex-shrink-0 border border-primary/10"
+          whileHover={{ scale: 1.05, rotate: 5 }}
+          transition={{ type: "spring", stiffness: 400 }}
+        >
           {icon}
-        </div>
+        </motion.div>
         <div>
-          <span className="text-xs font-mono text-secondary uppercase tracking-wider">
+          <span className="text-xs font-semibold text-secondary uppercase tracking-wider flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
             {subtitle}
           </span>
           <h3 className="text-xl font-bold text-foreground">{title}</h3>
@@ -36,9 +41,9 @@ const DiagnosticCard = ({
       </div>
 
       {/* Question */}
-      <p className="text-lg text-foreground mb-6">{question}</p>
+      <p className="text-lg text-foreground mb-6 font-medium">{question}</p>
 
-      {/* Options */}
+      {/* Options with enhanced interactivity */}
       <div className="space-y-3">
         {options.map((option, index) => {
           const isSelected = selectedOption === option;
@@ -46,27 +51,51 @@ const DiagnosticCard = ({
             <motion.button
               key={option}
               onClick={() => onSelect(option)}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              className={`w-full text-left p-4 rounded-lg border transition-all duration-200 flex items-center gap-3 group ${
-                isSelected
-                  ? "bg-primary/10 border-primary text-foreground"
-                  : "bg-muted/30 border-border hover:border-primary/50 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.06, type: "spring", stiffness: 300 }}
+              whileHover={{ x: 6 }}
+              whileTap={{ scale: 0.98 }}
+              className={`option-card w-full text-left flex items-center gap-4 group ${
+                isSelected ? "selected" : ""
               }`}
             >
+              {/* Radio indicator */}
               <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
                   isSelected
                     ? "bg-primary border-primary"
-                    : "border-muted-foreground group-hover:border-primary/50"
+                    : "border-muted-foreground/30 group-hover:border-primary/50"
                 }`}
               >
-                {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                {isSelected && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500 }}
+                  >
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  </motion.div>
+                )}
               </div>
-              <span className="text-sm md:text-base">{option}</span>
+              
+              {/* Option text */}
+              <span className={`text-sm md:text-base transition-colors ${
+                isSelected ? "text-foreground font-medium" : "text-muted-foreground group-hover:text-foreground"
+              }`}>
+                {option}
+              </span>
+
+              {/* Selected indicator */}
+              {isSelected && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="ml-auto"
+                >
+                  <Sparkles className="w-4 h-4 text-primary" />
+                </motion.div>
+              )}
             </motion.button>
           );
         })}
