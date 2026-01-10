@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hackwell Design System - Clean Light Mode with Addictive UX */
+/* Hackwell Design System - Light & Dark Mode with Smooth UX */
 
 @layer base {
   :root {
@@ -69,6 +69,56 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 158 64% 42%;
   }
+
+  /* Dark mode colors */
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 20% 95%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 158 64% 50%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 243 75% 65%;
+    --secondary-foreground: 222 47% 6%;
+
+    --muted: 222 40% 15%;
+    --muted-foreground: 215 16% 60%;
+
+    --accent: 158 64% 12%;
+    --accent-foreground: 158 64% 70%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 158 64% 50%;
+
+    --emerald: 158 64% 50%;
+    --emerald-glow: 158 84% 60%;
+    --emerald-soft: 158 64% 12%;
+    --indigo: 243 75% 65%;
+    --indigo-glow: 243 75% 75%;
+    --indigo-soft: 243 75% 12%;
+
+    --surface-soft: 222 47% 10%;
+    --surface-hover: 222 47% 14%;
+
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 158 64% 50%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 222 40% 15%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 222 30% 18%;
+    --sidebar-ring: 158 64% 50%;
+  }
 }
 
 @layer base {
@@ -76,12 +126,18 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv11", "ss01";
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Custom scrollbar - Light theme */
+  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -94,6 +150,7 @@
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 4px;
+    transition: background 0.3s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -102,6 +159,11 @@
 }
 
 @layer components {
+  /* Smooth transition utility */
+  .smooth-all {
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
   /* Clean elevated card */
   .card-elevated {
     @apply relative overflow-hidden rounded-2xl bg-card;
@@ -110,7 +172,8 @@
       0 4px 8px hsl(var(--foreground) / 0.04),
       0 12px 24px hsl(var(--foreground) / 0.05);
     border: 1px solid hsl(var(--border));
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform, box-shadow;
   }
 
   .card-elevated:hover {
@@ -118,7 +181,7 @@
       0 2px 4px hsl(var(--foreground) / 0.04),
       0 8px 16px hsl(var(--foreground) / 0.06),
       0 20px 40px hsl(var(--foreground) / 0.08);
-    transform: translateY(-2px);
+    transform: translateY(-4px);
   }
 
   /* Interactive card with glow on hover */
@@ -126,19 +189,21 @@
     @apply relative overflow-hidden rounded-2xl bg-card cursor-pointer;
     box-shadow: 0 2px 8px hsl(var(--foreground) / 0.04);
     border: 1px solid hsl(var(--border));
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform, box-shadow, border-color;
   }
 
   .card-interactive:hover {
-    border-color: hsl(var(--primary) / 0.3);
+    border-color: hsl(var(--primary) / 0.4);
     box-shadow: 
-      0 4px 16px hsl(var(--primary) / 0.1),
-      0 0 0 4px hsl(var(--primary) / 0.05);
-    transform: translateY(-3px) scale(1.01);
+      0 8px 24px hsl(var(--primary) / 0.15),
+      0 0 0 4px hsl(var(--primary) / 0.08);
+    transform: translateY(-4px) scale(1.02);
   }
 
   .card-interactive:active {
-    transform: translateY(-1px) scale(0.99);
+    transform: translateY(-1px) scale(0.98);
+    transition-duration: 0.15s;
   }
 
   /* Gradient text effects */
@@ -240,25 +305,27 @@
     @apply relative p-4 rounded-xl border-2 cursor-pointer;
     border-color: hsl(var(--border));
     background: hsl(var(--card));
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    will-change: transform, border-color, background-color;
   }
 
   .option-card:hover {
-    border-color: hsl(var(--primary) / 0.4);
+    border-color: hsl(var(--primary) / 0.5);
     background: hsl(var(--accent));
-    transform: translateX(4px);
+    transform: translateX(8px) scale(1.01);
   }
 
   .option-card.selected {
     border-color: hsl(var(--primary));
     background: hsl(var(--accent));
-    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.1);
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.15);
+    transform: translateX(4px);
   }
 
   .option-card.selected::before {
     content: '';
     @apply absolute inset-0 rounded-xl pointer-events-none;
-    background: linear-gradient(135deg, hsl(var(--primary) / 0.05), transparent);
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.08), transparent);
   }
 
   /* Shimmer loading effect */
@@ -315,16 +382,16 @@
 /* Additional utility animations */
 @layer utilities {
   .animate-bounce-subtle {
-    animation: bounce-subtle 2s ease-in-out infinite;
+    animation: bounce-subtle 3s ease-in-out infinite;
   }
 
   @keyframes bounce-subtle {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
+    50% { transform: translateY(-8px); }
   }
 
   .animate-wiggle {
-    animation: wiggle 0.5s ease-in-out;
+    animation: wiggle 0.6s ease-in-out;
   }
 
   @keyframes wiggle {
@@ -334,11 +401,37 @@
   }
 
   .animate-slide-up {
-    animation: slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: slide-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
   @keyframes slide-up {
-    from { transform: translateY(20px); opacity: 0; }
+    from { transform: translateY(30px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
+  }
+
+  .animate-fade-scale {
+    animation: fade-scale 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes fade-scale {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .animate-float {
+    animation: float-smooth 6s ease-in-out infinite;
+  }
+
+  @keyframes float-smooth {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    33% { transform: translateY(-10px) rotate(2deg); }
+    66% { transform: translateY(-5px) rotate(-1deg); }
+  }
+
+  /* GPU acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
   }
 }

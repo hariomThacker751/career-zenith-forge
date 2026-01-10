@@ -45,17 +45,21 @@ const DiagnosticCard = ({
 
       {/* Options with enhanced interactivity */}
       <div className="space-y-3">
-        {options.map((option, index) => {
+      {options.map((option, index) => {
           const isSelected = selectedOption === option;
           return (
             <motion.button
               key={option}
               onClick={() => onSelect(option)}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.06, type: "spring", stiffness: 300 }}
-              whileHover={{ x: 6 }}
-              whileTap={{ scale: 0.98 }}
+              initial={{ opacity: 0, x: -30, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ 
+                delay: index * 0.08, 
+                duration: 0.4,
+                ease: [0.34, 1.56, 0.64, 1]
+              }}
+              whileHover={{ x: 8, scale: 1.01 }}
+              whileTap={{ scale: 0.97 }}
               className={`option-card w-full text-left flex items-center gap-4 group ${
                 isSelected ? "selected" : ""
               }`}
