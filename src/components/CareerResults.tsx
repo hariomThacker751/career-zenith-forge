@@ -9,16 +9,15 @@ import {
   Brain, 
   Globe,
   Sparkles,
-  ChevronRight,
   Loader2,
-  Zap,
   Target,
   TrendingUp,
-  ArrowRight
+  Check,
+  X,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 interface CareerPath {
   id: string;
@@ -49,18 +48,18 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 const LoadingAnimation = () => {
-  const [currentNode, setCurrentNode] = useState(0);
-  const nodes = [
-    { label: "Hobbies", color: "from-pink-500 to-rose-500" },
-    { label: "Interests", color: "from-violet-500 to-purple-500" },
-    { label: "Skills", color: "from-primary to-emerald-400" },
-    { label: "Academics", color: "from-amber-500 to-orange-500" },
+  const [currentPhase, setCurrentPhase] = useState(0);
+  const phases = [
+    "Analyzing your profile...",
+    "Mapping skills to careers...",
+    "Calculating match scores...",
+    "Generating prediction..."
   ];
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentNode(prev => (prev + 1) % nodes.length);
-    }, 800);
+      setCurrentPhase(prev => (prev + 1) % phases.length);
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -71,7 +70,6 @@ const LoadingAnimation = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="relative mb-8"
       >
-        {/* Central brain node */}
         <motion.div
           animate={{ 
             scale: [1, 1.1, 1],
@@ -86,63 +84,16 @@ const LoadingAnimation = () => {
         >
           <Brain className="w-10 h-10 text-primary" />
         </motion.div>
-
-        {/* Orbiting nodes */}
-        {nodes.map((node, index) => {
-          const angle = (index * 90 - 45) * (Math.PI / 180);
-          const radius = 100;
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
-          
-          return (
-            <motion.div
-              key={node.label}
-              initial={{ opacity: 0 }}
-              animate={{ 
-                opacity: currentNode === index ? 1 : 0.4,
-                scale: currentNode === index ? 1.2 : 1
-              }}
-              className="absolute top-1/2 left-1/2"
-              style={{ 
-                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` 
-              }}
-            >
-              <div className={`px-3 py-1.5 rounded-full bg-gradient-to-r ${node.color} text-white text-xs font-bold`}>
-                {node.label}
-              </div>
-              {currentNode === index && (
-                <motion.div
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  className="absolute inset-0"
-                >
-                  <svg className="absolute inset-0 w-full h-full overflow-visible">
-                    <motion.line
-                      x1="50%"
-                      y1="50%"
-                      x2={-x + 48}
-                      y2={-y + 12}
-                      stroke="rgba(16, 185, 129, 0.5)"
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ duration: 0.5 }}
-                    />
-                  </svg>
-                </motion.div>
-              )}
-            </motion.div>
-          );
-        })}
       </motion.div>
 
       <motion.h3
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        key={currentPhase}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
         className="text-xl font-bold text-primary mb-2"
       >
-        Analyzing Your Profile
+        {phases[currentPhase]}
       </motion.h3>
       <motion.p
         initial={{ opacity: 0 }}
@@ -151,7 +102,7 @@ const LoadingAnimation = () => {
         className="text-muted-foreground text-sm flex items-center gap-2"
       >
         <Loader2 className="w-4 h-4 animate-spin" />
-        Connecting {nodes[currentNode].label} to Career Nodes...
+        AI Career Prediction Engine Active
       </motion.p>
     </div>
   );
@@ -159,19 +110,17 @@ const LoadingAnimation = () => {
 
 const CareerResults = ({ quizAnswers, onSelectCareer, onBack }: CareerResultsProps) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [careers, setCareers] = useState<CareerPath[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedCareer, setSelectedCareer] = useState<CareerPath | null>(null);
+  const [predictedCareer, setPredictedCareer] = useState<CareerPath | null>(null);
+  const [hasAgreed, setHasAgreed] = useState<boolean | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   useEffect(() => {
-    fetchCareerRecommendations();
+    fetchCareerPrediction();
   }, []);
 
-  const fetchCareerRecommendations = async () => {
+  const fetchCareerPrediction = async () => {
     setIsLoading(true);
-    setError(null);
     
-    // Add a minimum loading time for better UX
     const minLoadTime = new Promise(resolve => setTimeout(resolve, 2500));
     
     try {
@@ -186,139 +135,184 @@ const CareerResults = ({ quizAnswers, onSelectCareer, onBack }: CareerResultsPro
 
       if (fnError) throw fnError;
       
-      // Handle rate limiting specifically
       if (data?.error?.includes("Rate limit")) {
         console.warn("Rate limited, using smart fallback");
-        setCareers(getFallbackCareers(quizAnswers));
+        setPredictedCareer(getPredictedCareer(quizAnswers));
         return;
       }
       
       if (data?.careers && data.careers.length > 0) {
-        setCareers(data.careers);
+        // Take the top match as the predicted career
+        setPredictedCareer(data.careers[0]);
       } else {
-        // No error, but no careers - use fallback
-        setCareers(getFallbackCareers(quizAnswers));
+        setPredictedCareer(getPredictedCareer(quizAnswers));
       }
     } catch (err) {
-      console.error("Career mapping error:", err);
-      // Use smart fallback silently without showing error to user
-      setCareers(getFallbackCareers(quizAnswers));
+      console.error("Career prediction error:", err);
+      setPredictedCareer(getPredictedCareer(quizAnswers));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getFallbackCareers = (answers: Record<string, string[]>): CareerPath[] => {
-    const hobbies = answers.hobbies || [];
-    const interests = answers.interests || [];
-    const skills = answers.skills || [];
-
-    const careersData: CareerPath[] = [];
-
-    // Gaming + Logic = Game Dev / Backend
-    if (hobbies.includes("gaming") && (skills.includes("coding") || skills.includes("math"))) {
-      careersData.push({
-        id: "game-dev",
-        title: "Game Engine Developer",
-        icon: "gamepad",
-        description: "Build the core systems that power next-gen games. From physics engines to rendering pipelines.",
-        matchScore: 92,
-        justification: "Your love for gaming combined with strong logic skills makes you perfect for game engine development.",
-        keySkills: ["C++", "Unity/Unreal", "Physics", "3D Math", "Optimization"],
-        averageSalary: "$95,000 - $150,000",
-        demandLevel: "High"
-      });
+  const getPredictedCareer = (answers: Record<string, string[]>): CareerPath => {
+    const workEnergy = answers.work_energy?.[0] || "";
+    const skillLevel = answers.skill_level?.[0] || "beginner";
+    const buildIdea = answers.build_idea?.[0] || "";
+    
+    // Analyze the build idea for keywords
+    const ideaLower = buildIdea.toLowerCase();
+    
+    // Logic-focused prediction
+    if (workEnergy === "logic" || ideaLower.includes("algorithm") || ideaLower.includes("problem")) {
+      return {
+        id: "backend-engineer",
+        title: "Backend Engineer",
+        icon: "server",
+        description: "Design and build the server-side logic, APIs, and databases that power applications. Master of efficiency and scalability.",
+        matchScore: 89,
+        justification: "Your love for logic and problem-solving aligns perfectly with backend engineering, where you'll architect systems that handle millions of requests.",
+        keySkills: ["Python/Go", "SQL", "APIs", "System Design", "Cloud"],
+        averageSalary: "$100,000 - $160,000",
+        demandLevel: "Very High"
+      };
     }
-
-    // AI Interest + Coding
-    if (interests.includes("ai") || hobbies.includes("problem-solving")) {
-      careersData.push({
+    
+    // Visual/Design-focused prediction
+    if (workEnergy === "visuals" || ideaLower.includes("design") || ideaLower.includes("beautiful") || ideaLower.includes("ui")) {
+      return {
+        id: "frontend-engineer",
+        title: "Frontend Engineer",
+        icon: "palette",
+        description: "Craft beautiful, responsive user interfaces that delight users. Bridge design and code to create seamless experiences.",
+        matchScore: 91,
+        justification: "Your passion for visuals and design makes you ideal for frontend development, where aesthetics meet functionality.",
+        keySkills: ["React", "TypeScript", "CSS/Tailwind", "Animation", "Accessibility"],
+        averageSalary: "$90,000 - $150,000",
+        demandLevel: "High"
+      };
+    }
+    
+    // Systems/Infrastructure-focused prediction
+    if (workEnergy === "systems" || ideaLower.includes("infrastructure") || ideaLower.includes("scale")) {
+      return {
+        id: "devops-engineer",
+        title: "DevOps Engineer",
+        icon: "server",
+        description: "Bridge development and operations. Build CI/CD pipelines, manage cloud infrastructure, and ensure 99.9% uptime.",
+        matchScore: 87,
+        justification: "Your interest in systems and infrastructure points to DevOps, where you'll automate and scale critical systems.",
+        keySkills: ["Docker", "Kubernetes", "AWS/GCP", "Terraform", "Linux"],
+        averageSalary: "$110,000 - $170,000",
+        demandLevel: "Very High"
+      };
+    }
+    
+    // Automation-focused prediction
+    if (workEnergy === "automation" || ideaLower.includes("automate") || ideaLower.includes("bot") || ideaLower.includes("ai")) {
+      return {
         id: "ml-engineer",
         title: "Machine Learning Engineer",
         icon: "brain",
-        description: "Design and deploy AI systems that learn from data. The frontier of tech innovation.",
+        description: "Build AI systems that learn and adapt. From recommendation engines to language models, shape the future of automation.",
         matchScore: 88,
-        justification: "Your interest in AI and problem-solving aligns perfectly with ML engineering demands.",
-        keySkills: ["Python", "TensorFlow/PyTorch", "Math", "Statistics", "Cloud"],
+        justification: "Your drive for automation combined with technical curiosity makes ML engineering your ideal path.",
+        keySkills: ["Python", "TensorFlow/PyTorch", "Statistics", "MLOps", "Data"],
         averageSalary: "$130,000 - $200,000",
         demandLevel: "Explosive"
-      });
+      };
     }
-
-    // Art + Design = UI/UX or Creative Tech
-    if (hobbies.includes("art") || skills.includes("design")) {
-      careersData.push({
-        id: "creative-tech",
+    
+    // People-focused prediction
+    if (workEnergy === "people" || ideaLower.includes("team") || ideaLower.includes("manage")) {
+      return {
+        id: "product-manager",
+        title: "Technical Product Manager",
+        icon: "globe",
+        description: "Lead product strategy with technical depth. Bridge engineering, design, and business to ship products users love.",
+        matchScore: 85,
+        justification: "Your people skills combined with technical understanding positions you perfectly for product leadership.",
+        keySkills: ["Roadmapping", "User Research", "Data Analysis", "Communication", "Agile"],
+        averageSalary: "$120,000 - $180,000",
+        demandLevel: "High"
+      };
+    }
+    
+    // Creativity-focused prediction
+    if (workEnergy === "creativity" || ideaLower.includes("game") || ideaLower.includes("creative") || ideaLower.includes("art")) {
+      return {
+        id: "creative-technologist",
         title: "Creative Technologist",
         icon: "palette",
-        description: "Bridge art and technology. Create interactive experiences, generative art, and innovative interfaces.",
-        matchScore: 85,
-        justification: "Your artistic eye combined with tech skills positions you for creative technology roles.",
-        keySkills: ["JavaScript", "Three.js", "WebGL", "Design Systems", "Motion"],
+        description: "Blend art and code to create interactive experiences, generative art, and innovative digital products.",
+        matchScore: 86,
+        justification: "Your creative energy combined with technical skills makes you perfect for pushing boundaries in creative tech.",
+        keySkills: ["JavaScript", "Three.js", "WebGL", "Generative AI", "Motion Design"],
         averageSalary: "$85,000 - $140,000",
         demandLevel: "High"
-      });
+      };
     }
+    
+    // Default: Full-stack (versatile option)
+    return {
+      id: "fullstack-developer",
+      title: "Full-Stack Developer",
+      icon: "cpu",
+      description: "Master both frontend and backend. The most versatile role in tech, capable of building complete products end-to-end.",
+      matchScore: 82,
+      justification: "Your diverse interests and adaptability make full-stack development ideal—you'll never be limited to one domain.",
+      keySkills: ["React", "Node.js", "TypeScript", "SQL", "Cloud"],
+      averageSalary: "$90,000 - $150,000",
+      demandLevel: "Very High"
+    };
+  };
 
-    // FinTech interest
-    if (interests.includes("fintech") || skills.includes("excel")) {
-      careersData.push({
-        id: "fintech-dev",
-        title: "FinTech Developer",
-        icon: "globe",
-        description: "Build the future of finance. From trading systems to blockchain applications.",
-        matchScore: 82,
-        justification: "Your interest in finance and analytical skills are perfect for FinTech development.",
-        keySkills: ["Python", "SQL", "APIs", "Blockchain", "Security"],
-        averageSalary: "$100,000 - $170,000",
-        demandLevel: "Very High"
-      });
-    }
-
-    // Systems interest = Backend/Infrastructure
-    if (interests.includes("systems") || skills.includes("coding")) {
-      careersData.push({
-        id: "backend-architect",
-        title: "Backend Architect",
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    setHasAgreed(null);
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Generate an alternative career
+    const alternatives: CareerPath[] = [
+      {
+        id: "data-engineer",
+        title: "Data Engineer",
         icon: "server",
-        description: "Design scalable systems that handle millions of users. The backbone of modern tech.",
-        matchScore: 80,
-        justification: "Your interest in high-performance systems points to backend architecture.",
-        keySkills: ["Go/Rust", "Databases", "Kubernetes", "System Design", "Performance"],
-        averageSalary: "$120,000 - $180,000",
+        description: "Build data pipelines and infrastructure that power analytics and ML systems at scale.",
+        matchScore: 84,
+        justification: "Based on your profile, data engineering offers a strong path combining systems thinking with analytical work.",
+        keySkills: ["Python", "SQL", "Spark", "Airflow", "Cloud"],
+        averageSalary: "$110,000 - $170,000",
         demandLevel: "Very High"
-      });
-    }
-
-    // Default if nothing matched
-    if (careersData.length === 0) {
-      careersData.push(
-        {
-          id: "fullstack-dev",
-          title: "Full-Stack Developer",
-          icon: "cpu",
-          description: "Master both frontend and backend. The most versatile role in tech.",
-          matchScore: 75,
-          justification: "A full-stack role gives you flexibility to explore and find your niche.",
-          keySkills: ["React", "Node.js", "SQL", "TypeScript", "Cloud"],
-          averageSalary: "$80,000 - $140,000",
-          demandLevel: "Very High"
-        },
-        {
-          id: "product-engineer",
-          title: "Product Engineer",
-          icon: "globe",
-          description: "Build user-facing products from concept to launch. Blend tech with product thinking.",
-          matchScore: 72,
-          justification: "Your diverse interests make you suited for product-focused engineering.",
-          keySkills: ["JavaScript", "Product Sense", "UI/UX", "Analytics", "Communication"],
-          averageSalary: "$90,000 - $150,000",
-          demandLevel: "High"
-        }
-      );
-    }
-
-    return careersData.slice(0, 3);
+      },
+      {
+        id: "security-engineer",
+        title: "Security Engineer",
+        icon: "shield",
+        description: "Protect systems from threats. Design secure architectures and respond to vulnerabilities.",
+        matchScore: 83,
+        justification: "Your analytical mindset and attention to detail align well with cybersecurity challenges.",
+        keySkills: ["Security Tools", "Networking", "Python", "Penetration Testing", "Compliance"],
+        averageSalary: "$120,000 - $180,000",
+        demandLevel: "Explosive"
+      },
+      {
+        id: "mobile-developer",
+        title: "Mobile Developer",
+        icon: "cpu",
+        description: "Build native iOS and Android apps that millions of users interact with daily.",
+        matchScore: 85,
+        justification: "Mobile development lets you create tangible products that people use every day—highly rewarding!",
+        keySkills: ["React Native/Flutter", "Swift/Kotlin", "APIs", "UX Design", "Performance"],
+        averageSalary: "$95,000 - $155,000",
+        demandLevel: "High"
+      }
+    ];
+    
+    const randomAlt = alternatives[Math.floor(Math.random() * alternatives.length)];
+    setPredictedCareer(randomAlt);
+    setIsRegenerating(false);
   };
 
   const getDemandColor = (level: string) => {
@@ -333,150 +327,157 @@ const CareerResults = ({ quizAnswers, onSelectCareer, onBack }: CareerResultsPro
     return <LoadingAnimation />;
   }
 
+  if (!predictedCareer) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-muted-foreground">Unable to generate prediction. Please try again.</p>
+        <Button onClick={onBack} className="mt-4">Go Back</Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-2xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8"
       >
         <div className="pill-badge mb-4 mx-auto w-fit">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span>AI Career Analysis Complete</span>
+          <Target className="w-4 h-4 text-primary" />
+          <span>AI Career Prediction</span>
         </div>
         <h2 className="text-2xl md:text-3xl font-bold mb-2">
-          <span className="text-gradient-sunset">Your Top Career Matches</span>
+          <span className="text-gradient-sunset">Your Predicted Career Path</span>
         </h2>
         <p className="text-muted-foreground">
-          Based on your unique combination of hobbies, interests, and skills
+          Based on your unique profile, this is your best-fit role
         </p>
       </motion.div>
 
-      {error && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm"
-        >
-          {error}
-        </motion.div>
-      )}
-
-      <div className="space-y-4 mb-8">
-        <AnimatePresence>
-          {careers.map((career, index) => (
-            <motion.div
-              key={career.id}
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.15 }}
-              whileHover={{ scale: 1.01 }}
-              onClick={() => setSelectedCareer(selectedCareer?.id === career.id ? null : career)}
-              className={`glass-card p-6 cursor-pointer transition-all duration-300 ${
-                selectedCareer?.id === career.id 
-                  ? "emerald-glow-border" 
-                  : "hover:border-primary/30"
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                {/* Rank & Icon */}
-                <div className="flex flex-col items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                    index === 0 ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white" :
-                    index === 1 ? "bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800" :
-                    "bg-gradient-to-br from-amber-600 to-amber-800 text-white"
-                  }`}>
-                    #{index + 1}
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary">
-                    {iconMap[career.icon] || <Cpu className="w-6 h-6" />}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold">{career.title}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${getDemandColor(career.demandLevel)}`}>
-                        {career.demandLevel} Demand
-                      </span>
-                      <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 rounded-full">
-                        <Target className="w-3 h-3 text-primary" />
-                        <span className="text-xs font-bold text-primary">{career.matchScore}% Match</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-muted-foreground text-sm mb-3">{career.description}</p>
-
-                  {/* Justification */}
-                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 mb-3">
-                    <p className="text-sm italic text-primary/80">
-                      "{career.justification}"
-                    </p>
-                  </div>
-
-                  {/* Expanded content */}
-                  <AnimatePresence>
-                    {selectedCareer?.id === career.id && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/50">
-                          <div>
-                            <h4 className="text-xs font-bold text-muted-foreground mb-2">KEY SKILLS TO MASTER</h4>
-                            <div className="flex flex-wrap gap-1.5">
-                              {career.keySkills.map(skill => (
-                                <span key={skill} className="px-2 py-1 bg-muted rounded text-xs font-medium">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-bold text-muted-foreground mb-2">SALARY RANGE (2026)</h4>
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="w-4 h-4 text-primary" />
-                              <span className="font-bold text-primary">{career.averageSalary}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectCareer(career);
-                          }}
-                          className="w-full mt-4 gap-2 bg-gradient-to-r from-primary to-primary/90 text-white"
-                        >
-                          <Zap className="w-4 h-4" />
-                          Start My Journey as {career.title}
-                          <ArrowRight className="w-4 h-4" />
-                        </Button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
+      {/* Predicted Career Card */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="text-center"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="glass-card p-8 mb-8 emerald-glow-border"
       >
-        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
-          ← Retake Discovery Quiz
-        </Button>
+        <div className="flex items-center gap-4 mb-6">
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 300, delay: 0.2 }}
+            className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary"
+          >
+            {iconMap[predictedCareer.icon] || <Cpu className="w-8 h-8" />}
+          </motion.div>
+          <div className="flex-1">
+            <h3 className="text-2xl font-bold">{predictedCareer.title}</h3>
+            <div className="flex items-center gap-3 mt-1">
+              <span className={`px-2 py-1 rounded-full text-xs font-bold ${getDemandColor(predictedCareer.demandLevel)}`}>
+                {predictedCareer.demandLevel} Demand
+              </span>
+              <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 rounded-full">
+                <Target className="w-3 h-3 text-primary" />
+                <span className="text-xs font-bold text-primary">{predictedCareer.matchScore}% Match</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-muted-foreground mb-4">{predictedCareer.description}</p>
+
+        <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 mb-6">
+          <p className="text-sm italic text-primary/90">
+            "{predictedCareer.justification}"
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <h4 className="text-xs font-bold text-muted-foreground mb-2">KEY SKILLS TO LEARN</h4>
+            <div className="flex flex-wrap gap-1.5">
+              {predictedCareer.keySkills.map(skill => (
+                <span key={skill} className="px-2 py-1 bg-muted rounded text-xs font-medium">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-muted-foreground mb-2">SALARY RANGE (2026)</h4>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              <span className="font-bold text-primary">{predictedCareer.averageSalary}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Confirmation Buttons */}
+        {hasAgreed === null && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <p className="text-center text-sm text-muted-foreground mb-4">
+              Does this career path resonate with you?
+            </p>
+            <div className="flex gap-4 justify-center">
+              <Button
+                onClick={() => setHasAgreed(true)}
+                className="gap-2 bg-gradient-to-r from-primary to-primary/90 text-white px-8"
+              >
+                <Check className="w-4 h-4" />
+                Yes, this is me!
+              </Button>
+              <Button
+                onClick={handleRegenerate}
+                variant="outline"
+                disabled={isRegenerating}
+                className="gap-2"
+              >
+                {isRegenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Try Another
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* After agreeing - Show proceed button */}
+        {hasAgreed === true && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+          >
+            <div className="flex items-center justify-center gap-2 text-primary mb-4">
+              <Sparkles className="w-5 h-5" />
+              <span className="font-bold">Excellent choice! Let's build your roadmap.</span>
+            </div>
+            <Button
+              onClick={() => onSelectCareer(predictedCareer)}
+              className="gap-2 bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/25 px-8 py-6 text-base"
+            >
+              <Target className="w-5 h-5" />
+              Start My Journey as {predictedCareer.title}
+            </Button>
+          </motion.div>
+        )}
       </motion.div>
+
+      {/* Back button */}
+      {hasAgreed === null && (
+        <div className="text-center">
+          <Button variant="ghost" onClick={onBack} className="gap-2">
+            <X className="w-4 h-4" />
+            Retake Quiz
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
