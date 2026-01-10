@@ -142,10 +142,43 @@ const DiagnosticFlow = () => {
     setReasoningEntries(prev => [...prev, entry]);
   }, []);
 
+  // Store explore quiz answers for career analysis
+  const [exploreAnswers, setExploreAnswers] = useState<Record<string, string[]>>({});
+  const [selectedCareer, setSelectedCareer] = useState<string | null>(null);
+
   const handlePathSelect = (path: PathType) => {
     setSelectedPath(path);
-    addReasoningEntry("ORCHESTRATOR", `User selected ${path === "targeted" ? "Targeted Path" : "Explore Mode"}. Initializing profile extraction...`, "decision");
+    if (path === "explore") {
+      addReasoningEntry("ORCHESTRATOR", "User selected Explore Mode. Launching discovery quiz to map interests to careers...", "decision");
+      setFlowState("explore-quiz");
+    } else {
+      addReasoningEntry("ORCHESTRATOR", "User selected Targeted Path. Initializing profile extraction...", "decision");
+      setFlowState("resume");
+    }
+  };
+
+  const handleExploreQuizComplete = (quizAnswers: Record<string, string[]>) => {
+    setExploreAnswers(quizAnswers);
+    addReasoningEntry("PROFILER", "Quiz responses captured. Analyzing interest-skill intersection...", "analysis");
+    addReasoningEntry("PULSE", "Mapping hobbies and skills to high-demand career paths...", "analysis");
+    setFlowState("career-results");
+  };
+
+  const handleExploreQuizBack = () => {
+    setFlowState("discovery");
+    setExploreAnswers({});
+  };
+
+  const handleCareerSelect = (career: { title: string }) => {
+    setSelectedCareer(career.title);
+    addReasoningEntry("ORCHESTRATOR", `Career path locked: ${career.title}. Initializing "Close the Gap" pipeline...`, "decision");
+    addReasoningEntry("FORGE", `Preparing skill gap assessment for ${career.title}...`, "analysis");
+    // Transition to resume upload for personalization, then to diagnostic questions
     setFlowState("resume");
+  };
+
+  const handleCareerResultsBack = () => {
+    setFlowState("explore-quiz");
   };
 
   const handleSelect = (answer: string) => {
@@ -174,6 +207,8 @@ const DiagnosticFlow = () => {
     setSelectedPath(null);
     setReasoningEntries([]);
     setIsReasoningActive(false);
+    setExploreAnswers({});
+    setSelectedCareer(null);
     resetPhases();
   };
 
@@ -208,7 +243,7 @@ const DiagnosticFlow = () => {
     <section className="relative py-16 px-6">
       <div className="max-w-4xl mx-auto">
         {/* Live Reasoning Log - Always visible during active states */}
-        {(flowState === "analysis" || flowState === "questions" || flowState === "phases") && reasoningEntries.length > 0 && (
+        {(flowState === "analysis" || flowState === "questions" || flowState === "phases" || flowState === "career-results") && reasoningEntries.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -221,8 +256,8 @@ const DiagnosticFlow = () => {
           </motion.div>
         )}
 
-        {/* Section header - hide for discovery */}
-        {flowState !== "discovery" && (
+        {/* Section header - hide for discovery, explore-quiz, and career-results (they have their own headers) */}
+        {flowState !== "discovery" && flowState !== "explore-quiz" && flowState !== "career-results" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -275,6 +310,37 @@ const DiagnosticFlow = () => {
               transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
             >
               <InitialDiscovery onSelectPath={handlePathSelect} />
+            </motion.div>
+          )}
+
+          {flowState === "explore-quiz" && (
+            <motion.div
+              key="explore-quiz"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <ExploreQuiz 
+                onComplete={handleExploreQuizComplete} 
+                onBack={handleExploreQuizBack} 
+              />
+            </motion.div>
+          )}
+
+          {flowState === "career-results" && (
+            <motion.div
+              key="career-results"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <CareerResults 
+                quizAnswers={exploreAnswers}
+                onSelectCareer={handleCareerSelect}
+                onBack={handleCareerResultsBack}
+              />
             </motion.div>
           )}
 
