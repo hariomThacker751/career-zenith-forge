@@ -99,32 +99,38 @@ export const ActivityFeed = ({ userId, activities: initialActivities }: Activity
     return `${diffDays}d ago`;
   };
 
+  console.log("[ActivityFeed] Rendering with", activities.length, "activities");
+  
   return (
-    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden h-full flex flex-col">
+    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden h-full flex flex-col shadow-lg shadow-black/20">
       {/* Header */}
-      <div className="p-4 border-b border-border/30 flex items-center gap-2">
-        <Activity className="w-5 h-5 text-primary" />
-        <h3 className="font-semibold text-foreground">AI Feed</h3>
-        <span className="ml-auto text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+      <div className="p-4 border-b border-border/30 flex items-center gap-2 bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Activity className="w-4 h-4 text-primary" />
+        </div>
+        <h3 className="font-bold text-foreground">AI Feed</h3>
+        <span className="ml-auto text-xs text-primary font-medium bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
           Live
         </span>
       </div>
 
       {/* Activity List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[400px]">
         <AnimatePresence initial={false}>
           {activities.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Bot className="w-10 h-10 text-muted-foreground/50 mb-2" />
-              <p className="text-sm text-muted-foreground">
+              <div className="w-12 h-12 rounded-xl bg-muted/30 flex items-center justify-center mb-3">
+                <Bot className="w-6 h-6 text-muted-foreground/50" />
+              </div>
+              <p className="text-sm text-muted-foreground font-medium">
                 No activity yet
               </p>
-              <p className="text-xs text-muted-foreground/70">
+              <p className="text-xs text-muted-foreground/70 mt-1">
                 AI agents will post updates here
               </p>
             </div>
           ) : (
-            activities.map((activity, index) => {
+            activities.map((activity) => {
               const config = agentConfig[activity.agent_type];
               const Icon = config.icon;
 
@@ -135,17 +141,17 @@ export const ActivityFeed = ({ userId, activities: initialActivities }: Activity
                   animate={{ opacity: 1, y: 0, height: "auto" }}
                   exit={{ opacity: 0, y: 10, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="flex gap-3"
+                  className="flex gap-3 p-2 rounded-lg hover:bg-muted/20 transition-colors"
                 >
                   <div
-                    className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0`}
+                    className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0 border border-${config.color.replace('text-', '')}/20`}
                   >
                     <Icon className={`w-4 h-4 ${config.color}`} />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`text-xs font-medium ${config.color}`}>
+                      <span className={`text-xs font-semibold ${config.color}`}>
                         {config.label}
                       </span>
                       <span className="text-xs text-muted-foreground">
@@ -164,12 +170,12 @@ export const ActivityFeed = ({ userId, activities: initialActivities }: Activity
       </div>
 
       {/* Realtime indicator */}
-      <div className="p-3 border-t border-border/30 flex items-center justify-center gap-2">
+      <div className="p-3 border-t border-border/30 flex items-center justify-center gap-2 bg-gradient-to-r from-transparent via-primary/5 to-transparent">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground font-medium">
           Listening for updates
         </span>
       </div>
