@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Brain,
   Compass,
-  Rocket
+  Rocket,
+  ArrowRight
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
@@ -34,6 +35,7 @@ import GamificationPanel from "./GamificationPanel";
 import { Button } from "./ui/button";
 import { useResume } from "@/contexts/ResumeContext";
 import { usePhase } from "@/contexts/PhaseContext";
+import { Link } from "react-router-dom";
 
 interface Question {
   id: number;
@@ -638,6 +640,24 @@ const DiagnosticFlow = () => {
               className="space-y-8"
             >
               <PhaseIndicator />
+              
+              {/* Quick access to Dashboard */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center justify-center"
+              >
+                <Link to="/dashboard">
+                  <Button 
+                    variant="outline" 
+                    size="lg" 
+                    className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              </motion.div>
               
               <AnimatePresence mode="wait">
                 {currentPhase === 1 && (
