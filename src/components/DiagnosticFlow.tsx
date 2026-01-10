@@ -13,7 +13,8 @@ import {
   FileCheck,
   Zap,
   AlertTriangle,
-  Brain
+  Brain,
+  Compass
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
@@ -24,6 +25,8 @@ import Phase1Foundation from "./Phase1Foundation";
 import Phase2Forge from "./Phase2Forge";
 import Phase3Launch from "./Phase3Launch";
 import InitialDiscovery from "./InitialDiscovery";
+import ExploreQuiz from "./ExploreQuiz";
+import CareerResults from "./CareerResults";
 import LiveReasoningLog, { ReasoningEntry } from "./LiveReasoningLog";
 import GamificationPanel from "./GamificationPanel";
 import { Button } from "./ui/button";
@@ -112,7 +115,7 @@ const questions: Question[] = [
   }
 ];
 
-type FlowState = "discovery" | "resume" | "manual-recon" | "questions" | "analysis" | "phases";
+type FlowState = "discovery" | "explore-quiz" | "career-results" | "resume" | "manual-recon" | "questions" | "analysis" | "phases";
 type PathType = "targeted" | "explore";
 
 const DiagnosticFlow = () => {
