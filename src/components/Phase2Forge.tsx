@@ -34,8 +34,12 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchProjects = async () => {
-    if (!phaseData.agentInsights) {
-      setError("Agent insights not available. Please restart the analysis.");
+    // Allow either agent insights OR explore mode data (targetCareer + exploreAnswers)
+    const hasAgentInsights = !!phaseData.agentInsights;
+    const hasExploreData = !!phaseData.targetCareer && !!phaseData.exploreAnswers;
+    
+    if (!hasAgentInsights && !hasExploreData) {
+      setError("Profile data not available. Please restart the analysis.");
       setIsLoading(false);
       return;
     }
