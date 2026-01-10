@@ -117,6 +117,40 @@ RESUME ANALYSIS:
 Analyze this profile and provide your expert assessment.`;
 }
 
+// Retry with exponential backoff
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // If we get a 5xx error, retry
+      if (response.status >= 500 && i < maxRetries - 1) {
+        const delay = Math.pow(2, i) * 500; // 500ms, 1000ms, 2000ms
+        console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms due to status ${response.status}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (i < maxRetries - 1) {
+        const delay = Math.pow(2, i) * 500;
+        console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms due to error: ${lastError.message}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error("Max retries exceeded");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -137,24 +171,33 @@ serve(async (req) => {
 
     const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+    console.log(`Processing ${agentType} agent request...`);
+
+    const response = await fetchWithRetry(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash", // Using stable model instead of preview
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContext },
+          ],
+          max_tokens: 200,
+          temperature: 0.7,
+        }),
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContext },
-        ],
-        max_tokens: 200,
-        temperature: 0.7,
-      }),
-    });
+      3
+    );
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
@@ -167,13 +210,19 @@ serve(async (req) => {
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("AI analysis failed");
+      
+      // Return fallback response instead of throwing
+      const fallbackInsight = getFallbackInsight(agentType, answers, resumeSkills, resumeProjects);
+      return new Response(
+        JSON.stringify({ insight: fallbackInsight, agentType, fallback: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const data = await response.json();
     const insight = data.choices?.[0]?.message?.content?.trim() || "Analysis complete.";
+
+    console.log(`${agentType} agent completed successfully`);
 
     return new Response(
       JSON.stringify({ insight, agentType }),
@@ -181,9 +230,79 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Career agents error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error occurred" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    
+    // Try to parse request for fallback
+    try {
+      const body = await req.clone().json();
+      const { agentType, answers, resumeSkills, resumeProjects } = body;
+      const fallbackInsight = getFallbackInsight(agentType, answers, resumeSkills, resumeProjects);
+      
+      return new Response(
+        JSON.stringify({ insight: fallbackInsight, agentType, fallback: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch {
+      return new Response(
+        JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error occurred" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   }
 });
+
+// Fallback insights when AI fails
+function getFallbackInsight(
+  agentType: string,
+  answers: Record<number, string>,
+  resumeSkills: string[],
+  resumeProjects: string[]
+): string {
+  const year = answers?.[0] || "";
+  const interest = answers?.[1] || "";
+  const level = answers?.[2] || "";
+  const hours = answers?.[3] || "";
+
+  switch (agentType) {
+    case "profiler":
+      if (resumeSkills?.length >= 10) {
+        return `The Builder: Advanced profile with ${resumeSkills.length} skills detected. Precision Path recommended—focus on industry specialization and production-grade projects.`;
+      }
+      if (year.includes("1st") || year.includes("2nd")) {
+        return "The Learner: Foundation Path detected. Focus on CS fundamentals, problem-solving mindset, and building your first meaningful projects.";
+      }
+      return "The Achiever: Precision Path detected. Focus on specialization, interview prep, and production-grade portfolio building.";
+
+    case "pulse":
+      if (interest.includes("AI")) {
+        return "Hot roles: MLOps Engineer, Agentic AI Developer, AI Safety Researcher. Companies: OpenAI, Anthropic, Google DeepMind. Must-learn: LangChain + RAG architecture for 2026.";
+      }
+      if (interest.includes("web") || interest.includes("app")) {
+        return "Hot roles: Full-Stack Engineer, Design Engineer, Platform Lead. Companies: Vercel, Stripe, Linear. Must-learn: Next.js 15, React Server Components, Edge Computing.";
+      }
+      return "Hot roles: Platform Engineer, SRE, Data Engineer. Companies: Datadog, Snowflake, HashiCorp. Must-learn: Kubernetes, Go/Rust for systems, observability.";
+
+    case "forge":
+      if (level.includes("loop") || level.includes("basic")) {
+        return "CLI Study Scheduler: Automated Pomodoro timer with analytics and streak tracking. Tech: Python, JSON, matplotlib, argparse. USP: Learn file I/O, data viz, and CLI design.";
+      }
+      if (interest.includes("AI")) {
+        return "Autonomous PR Reviewer: LangChain agent that audits GitHub PRs for security vulnerabilities. Tech: Python, LangChain, GitHub API, ChromaDB. USP: Learns from codebase patterns.";
+      }
+      return "Real-time Collab Editor: Multiplayer code editor with AI pair programming. Tech: Next.js, WebSocket, GPT-4, Yjs. USP: Conflict resolution + live cursors + AI suggestions.";
+
+    case "gatekeeper":
+      if (resumeSkills?.length > 0 && resumeSkills.length < 5) {
+        return "⚠️ Skill Gap Risk: Limited foundation detected with only " + resumeSkills.length + " skills. Recommendation: Spend 2 weeks on fundamentals before diving into advanced projects.";
+      }
+      if (hours.includes("5-10")) {
+        return "⚠️ Velocity Risk: 5-10 hours/week may slow progress significantly. Recommendation: Focus on ONE skill deeply rather than spreading thin across multiple technologies.";
+      }
+      if (hours.includes("30+")) {
+        return "⚠️ Burnout Risk: 30+ hours/week needs a rest strategy. Recommendation: Schedule mandatory rest days. Consistency beats intensity—sustainable pace wins.";
+      }
+      return "✅ Roadmap validated. Success factor: Build in public, document your journey on Twitter/LinkedIn, and seek feedback from experienced developers early.";
+
+    default:
+      return "Analysis complete. Proceed to the next phase.";
+  }
+}
