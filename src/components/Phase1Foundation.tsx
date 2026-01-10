@@ -48,6 +48,8 @@ const Phase1Foundation = ({ answers }: Phase1FoundationProps) => {
           answers,
           resumeSkills: resumeData?.skills || [],
           resumeProjects: resumeData?.projects || [],
+          targetCareer: phaseData.targetCareer,
+          exploreAnswers: phaseData.exploreAnswers,
         },
       });
 

@@ -52,6 +52,8 @@ export interface AgentInsights {
 
 export interface PhaseData {
   agentInsights: AgentInsights | null;
+  targetCareer: string | null; // For Explore Mode users
+  exploreAnswers: Record<string, string[]> | null; // Quiz answers from Explore Mode
   phase1: {
     completed: boolean;
     learningPaths: LearningPath[];
@@ -76,6 +78,7 @@ interface PhaseContextType {
   phaseData: PhaseData;
   setCurrentPhase: (phase: 1 | 2 | 3) => void;
   setAgentInsights: (insights: AgentInsights) => void;
+  setTargetCareer: (career: string, exploreAnswers?: Record<string, string[]>) => void;
   completePhase1: (paths: LearningPath[], selected: string[]) => void;
   completePhase2: (project: ProjectPRD) => void;
   completePhase3: (url: string) => void;
@@ -85,6 +88,8 @@ interface PhaseContextType {
 
 const initialPhaseData: PhaseData = {
   agentInsights: null,
+  targetCareer: null,
+  exploreAnswers: null,
   phase1: {
     completed: false,
     learningPaths: [],
@@ -114,6 +119,14 @@ export const PhaseProvider = ({ children }: { children: ReactNode }) => {
     setPhaseData(prev => ({
       ...prev,
       agentInsights: insights,
+    }));
+  };
+
+  const setTargetCareer = (career: string, exploreAnswers?: Record<string, string[]>) => {
+    setPhaseData(prev => ({
+      ...prev,
+      targetCareer: career,
+      exploreAnswers: exploreAnswers || null,
     }));
   };
 
@@ -172,6 +185,7 @@ export const PhaseProvider = ({ children }: { children: ReactNode }) => {
         phaseData,
         setCurrentPhase,
         setAgentInsights,
+        setTargetCareer,
         completePhase1,
         completePhase2,
         completePhase3,

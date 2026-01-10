@@ -120,7 +120,7 @@ type PathType = "targeted" | "explore";
 
 const DiagnosticFlow = () => {
   const { resumeData } = useResume();
-  const { currentPhase, resetPhases } = usePhase();
+  const { currentPhase, resetPhases, setTargetCareer } = usePhase();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [flowState, setFlowState] = useState<FlowState>("discovery");
@@ -171,6 +171,8 @@ const DiagnosticFlow = () => {
 
   const handleCareerSelect = (career: { title: string; keySkills?: string[] }) => {
     setSelectedCareer(career.title);
+    // Store the target career in the phase context for use in generating personalized content
+    setTargetCareer(career.title, exploreAnswers);
     addReasoningEntry("ORCHESTRATOR", `Career path locked: ${career.title}. Initializing "Close the Gap" pipeline...`, "decision");
     addReasoningEntry("FORGE", `Preparing skill gap assessment for ${career.title}...`, "analysis");
     addReasoningEntry("PROFILER", `Target profession identified. Proceeding to gather additional context...`, "analysis");
