@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Orbit, 
@@ -12,7 +12,8 @@ import {
   Flame,
   FileCheck,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Brain
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
@@ -22,6 +23,9 @@ import PhaseIndicator from "./PhaseIndicator";
 import Phase1Foundation from "./Phase1Foundation";
 import Phase2Forge from "./Phase2Forge";
 import Phase3Launch from "./Phase3Launch";
+import InitialDiscovery from "./InitialDiscovery";
+import LiveReasoningLog, { ReasoningEntry } from "./LiveReasoningLog";
+import GamificationPanel from "./GamificationPanel";
 import { Button } from "./ui/button";
 import { useResume } from "@/contexts/ResumeContext";
 import { usePhase } from "@/contexts/PhaseContext";
@@ -108,15 +112,38 @@ const questions: Question[] = [
   }
 ];
 
-type FlowState = "resume" | "manual-recon" | "questions" | "analysis" | "phases";
+type FlowState = "discovery" | "resume" | "manual-recon" | "questions" | "analysis" | "phases";
+type PathType = "targeted" | "explore";
 
 const DiagnosticFlow = () => {
   const { resumeData } = useResume();
   const { currentPhase, resetPhases } = usePhase();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [flowState, setFlowState] = useState<FlowState>("resume");
+  const [flowState, setFlowState] = useState<FlowState>("discovery");
   const [parseError, setParseError] = useState(false);
+  const [selectedPath, setSelectedPath] = useState<PathType | null>(null);
+  const [reasoningEntries, setReasoningEntries] = useState<ReasoningEntry[]>([]);
+  const [isReasoningActive, setIsReasoningActive] = useState(false);
+  const [hackwellCredits, setHackwellCredits] = useState(0);
+  const [discountTier, setDiscountTier] = useState<"bronze" | "silver" | "gold" | "platinum">("bronze");
+
+  const addReasoningEntry = useCallback((agent: string, thought: string, type: ReasoningEntry["type"]) => {
+    const entry: ReasoningEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+      agent,
+      thought,
+      type,
+    };
+    setReasoningEntries(prev => [...prev, entry]);
+  }, []);
+
+  const handlePathSelect = (path: PathType) => {
+    setSelectedPath(path);
+    addReasoningEntry("ORCHESTRATOR", `User selected ${path === "targeted" ? "Targeted Path" : "Explore Mode"}. Initializing profile extraction...`, "decision");
+    setFlowState("resume");
+  };
 
   const handleSelect = (answer: string) => {
     setAnswers(prev => ({ ...prev, [currentStep]: answer }));
@@ -139,20 +166,29 @@ const DiagnosticFlow = () => {
   const handleReset = () => {
     setCurrentStep(0);
     setAnswers({});
-    setFlowState("resume");
+    setFlowState("discovery");
     setParseError(false);
+    setSelectedPath(null);
+    setReasoningEntries([]);
+    setIsReasoningActive(false);
     resetPhases();
   };
 
   const handleAnalysisComplete = () => {
+    setIsReasoningActive(false);
+    addReasoningEntry("ORCHESTRATOR", "Analysis complete. Transitioning to 3-Phase Execution Engine.", "action");
+    // Award credits for completing analysis
+    setHackwellCredits(prev => prev + 50);
     setFlowState("phases");
   };
 
   const handleStartDiagnostic = () => {
+    addReasoningEntry("PROFILER", "Resume data captured. Beginning diagnostic questionnaire...", "analysis");
     setFlowState("questions");
   };
 
   const handleManualReconComplete = () => {
+    addReasoningEntry("PROFILER", "Manual profile data captured. Proceeding with diagnostic...", "analysis");
     setFlowState("questions");
   };
 
@@ -167,50 +203,78 @@ const DiagnosticFlow = () => {
 
   return (
     <section className="relative py-16 px-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Section header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <motion.div 
-            className="pill-badge mb-4 mx-auto w-fit"
-            whileHover={{ scale: 1.02 }}
+      <div className="max-w-4xl mx-auto">
+        {/* Live Reasoning Log - Always visible during active states */}
+        {(flowState === "analysis" || flowState === "questions" || flowState === "phases") && reasoningEntries.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
           >
-            {flowState === "resume" && <Zap className="w-4 h-4 text-primary" />}
-            {flowState === "questions" && <Sparkles className="w-4 h-4 text-primary" />}
-            {flowState === "analysis" && <Flame className="w-4 h-4 text-orange-500" />}
-            {flowState === "manual-recon" && <AlertTriangle className="w-4 h-4 text-amber-500" />}
-            {flowState === "phases" && <Target className="w-4 h-4 text-primary" />}
-            <span>
-              {flowState === "resume" && "Step 1: Upload Resume (Optional)"}
-              {flowState === "questions" && `${answeredCount}/5 Questions Answered`}
-              {flowState === "analysis" && "AI Analysis in Progress"}
-              {flowState === "manual-recon" && "Manual Recon Mode"}
-              {flowState === "phases" && "Execution Engine Active"}
-            </span>
+            <LiveReasoningLog 
+              entries={reasoningEntries} 
+              isActive={isReasoningActive || flowState === "analysis"} 
+            />
           </motion.div>
-          
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">
-            <span className="text-gradient-sunset">
-              {flowState === "resume" && "Accelerate Your Analysis"}
-              {flowState === "questions" && "Universal Diagnostic"}
-              {flowState === "analysis" && "Analyzing Your Profile"}
-              {flowState === "manual-recon" && "Build Your Profile"}
-              {flowState === "phases" && "3-Phase Execution"}
-            </span>
-          </h2>
-          <p className="text-muted-foreground">
-            {flowState === "resume" && "Upload your resume to let our AI agents personalize your roadmap"}
-            {flowState === "questions" && "5 critical questions to determine your Career Velocity"}
-            {flowState === "analysis" && "Multi-agent system processing your responses..."}
-            {flowState === "manual-recon" && "Answer a few questions to unlock your roadmap"}
-            {flowState === "phases" && "Foundation → Forge → Launch"}
-          </p>
-        </motion.div>
+        )}
+
+        {/* Section header - hide for discovery */}
+        {flowState !== "discovery" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-12"
+          >
+            <motion.div 
+              className="pill-badge mb-4 mx-auto w-fit"
+              whileHover={{ scale: 1.02 }}
+            >
+              {flowState === "resume" && <Zap className="w-4 h-4 text-primary" />}
+              {flowState === "questions" && <Sparkles className="w-4 h-4 text-primary" />}
+              {flowState === "analysis" && <Brain className="w-4 h-4 text-primary" />}
+              {flowState === "manual-recon" && <AlertTriangle className="w-4 h-4 text-amber-500" />}
+              {flowState === "phases" && <Target className="w-4 h-4 text-primary" />}
+              <span>
+                {flowState === "resume" && "Step 1: Upload Resume (Optional)"}
+                {flowState === "questions" && `${answeredCount}/5 Questions Answered`}
+                {flowState === "analysis" && "AI Analysis in Progress"}
+                {flowState === "manual-recon" && "Manual Recon Mode"}
+                {flowState === "phases" && "Execution Engine Active"}
+              </span>
+            </motion.div>
+            
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">
+              <span className="text-gradient-sunset">
+                {flowState === "resume" && "Accelerate Your Analysis"}
+                {flowState === "questions" && "Universal Diagnostic"}
+                {flowState === "analysis" && "Analyzing Your Profile"}
+                {flowState === "manual-recon" && "Build Your Profile"}
+                {flowState === "phases" && "6-Month Execution Plan"}
+              </span>
+            </h2>
+            <p className="text-muted-foreground">
+              {flowState === "resume" && "Upload your resume to let our AI agents personalize your roadmap"}
+              {flowState === "questions" && "5 critical questions to determine your Career Velocity"}
+              {flowState === "analysis" && "Multi-agent system processing your responses..."}
+              {flowState === "manual-recon" && "Answer a few questions to unlock your roadmap"}
+              {flowState === "phases" && "Foundation → Forge → Launch"}
+            </p>
+          </motion.div>
+        )}
 
         <AnimatePresence mode="popLayout">
+          {flowState === "discovery" && (
+            <motion.div
+              key="discovery"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <InitialDiscovery onSelectPath={handlePathSelect} />
+            </motion.div>
+          )}
+
           {flowState === "resume" && (
             <motion.div
               key="resume"
