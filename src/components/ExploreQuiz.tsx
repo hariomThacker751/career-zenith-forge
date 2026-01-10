@@ -72,9 +72,9 @@ const exploreQuestions: ExploreQuestion[] = [
     ]
   },
   {
-    id: "academics",
-    category: "Academic Context",
-    question: "What's your academic background?",
+    id: "branch",
+    category: "Branch / Major",
+    question: "What's your field of study?",
     icon: <GraduationCap className="w-6 h-6" />,
     multiSelect: false,
     options: [
@@ -82,6 +82,19 @@ const exploreQuestions: ExploreQuestion[] = [
       { label: "Engineering (Non-CS)", value: "engineering", icon: <Server className="w-5 h-5" /> },
       { label: "Business / Commerce", value: "business", icon: <Banknote className="w-5 h-5" /> },
       { label: "Arts / Humanities", value: "arts", icon: <Palette className="w-5 h-5" /> },
+    ]
+  },
+  {
+    id: "year",
+    category: "Current Year",
+    question: "What year are you in?",
+    icon: <GraduationCap className="w-6 h-6" />,
+    multiSelect: false,
+    options: [
+      { label: "1st Year", value: "1st", icon: <Sparkles className="w-5 h-5" /> },
+      { label: "2nd Year", value: "2nd", icon: <Sparkles className="w-5 h-5" /> },
+      { label: "3rd Year", value: "3rd", icon: <Sparkles className="w-5 h-5" /> },
+      { label: "4th Year / Final", value: "4th", icon: <GraduationCap className="w-5 h-5" /> },
     ]
   }
 ];

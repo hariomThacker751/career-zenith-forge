@@ -169,12 +169,13 @@ const DiagnosticFlow = () => {
     setExploreAnswers({});
   };
 
-  const handleCareerSelect = (career: { title: string }) => {
+  const handleCareerSelect = (career: { title: string; keySkills?: string[] }) => {
     setSelectedCareer(career.title);
     addReasoningEntry("ORCHESTRATOR", `Career path locked: ${career.title}. Initializing "Close the Gap" pipeline...`, "decision");
     addReasoningEntry("FORGE", `Preparing skill gap assessment for ${career.title}...`, "analysis");
-    // Transition to resume upload for personalization, then to diagnostic questions
-    setFlowState("resume");
+    addReasoningEntry("PROFILER", `Target profession identified. Proceeding to gather additional context...`, "analysis");
+    // Go directly to questions to complete the diagnostic, then to analysis and phases
+    setFlowState("questions");
   };
 
   const handleCareerResultsBack = () => {
@@ -412,8 +413,21 @@ const DiagnosticFlow = () => {
               exit={{ opacity: 0, y: -30 }}
               transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
             >
+              {/* Career target badge for Explore Mode users */}
+              {selectedCareer && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/30 mb-6 w-fit mx-auto"
+                >
+                  <Target className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-bold text-primary">Target: {selectedCareer}</span>
+                  <Compass className="w-4 h-4 text-primary/60" />
+                </motion.div>
+              )}
+
               {/* Resume mini badge if uploaded */}
-              {resumeData && (
+              {resumeData && !selectedCareer && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
