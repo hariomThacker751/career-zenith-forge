@@ -7,10 +7,10 @@ import {
   Clock, 
   Target,
   ChevronRight,
-  RotateCcw,
-  Sparkles
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
+import AgentPanel from "./AgentPanel";
+import RoadmapView from "./RoadmapView";
 import { Button } from "./ui/button";
 
 interface Question {
@@ -95,10 +95,12 @@ const questions: Question[] = [
   }
 ];
 
+type FlowState = "questions" | "analysis" | "roadmap";
+
 const DiagnosticFlow = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [isComplete, setIsComplete] = useState(false);
+  const [flowState, setFlowState] = useState<FlowState>("questions");
 
   const handleSelect = (answer: string) => {
     setAnswers(prev => ({ ...prev, [currentStep]: answer }));
@@ -108,7 +110,7 @@ const DiagnosticFlow = () => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
-      setIsComplete(true);
+      setFlowState("analysis");
     }
   };
 
@@ -121,7 +123,11 @@ const DiagnosticFlow = () => {
   const handleReset = () => {
     setCurrentStep(0);
     setAnswers({});
-    setIsComplete(false);
+    setFlowState("questions");
+  };
+
+  const handleAnalysisComplete = () => {
+    setFlowState("roadmap");
   };
 
   const currentQuestion = questions[currentStep];
@@ -137,131 +143,139 @@ const DiagnosticFlow = () => {
           className="text-center mb-12"
         >
           <h2 className="text-2xl md:text-3xl font-bold mb-3">
-            <span className="text-gradient-emerald">Universal Diagnostic</span>
+            <span className="text-gradient-emerald">
+              {flowState === "questions" && "Universal Diagnostic"}
+              {flowState === "analysis" && "Analyzing Your Profile"}
+              {flowState === "roadmap" && "Your Career Roadmap"}
+            </span>
           </h2>
           <p className="text-muted-foreground">
-            5 critical questions to determine your Career Velocity
+            {flowState === "questions" && "5 critical questions to determine your Career Velocity"}
+            {flowState === "analysis" && "Multi-agent system processing your responses..."}
+            {flowState === "roadmap" && "Personalized path to career dominance"}
           </p>
         </motion.div>
 
-        {/* Progress bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground font-mono">
-              Question {currentStep + 1} of {questions.length}
-            </span>
-            <span className="text-sm text-primary font-mono">
-              {Math.round(progress)}%
-            </span>
-          </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-            />
-          </div>
-          
-          {/* Step indicators */}
-          <div className="flex items-center justify-between mt-4">
-            {questions.map((q, index) => (
-              <motion.div
-                key={q.id}
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-mono transition-all duration-300 ${
-                  index < currentStep
-                    ? "bg-primary text-primary-foreground"
-                    : index === currentStep
-                    ? "bg-primary/20 text-primary border border-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                {index + 1}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        {/* Question card */}
         <AnimatePresence mode="wait">
-          {!isComplete ? (
+          {flowState === "questions" && (
             <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.3 }}
+              key="questions"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
             >
-              <DiagnosticCard
-                icon={currentQuestion.icon}
-                title={currentQuestion.title}
-                subtitle={currentQuestion.subtitle}
-                question={currentQuestion.question}
-                options={currentQuestion.options}
-                selectedOption={answers[currentStep]}
-                onSelect={handleSelect}
-              />
+              {/* Progress bar */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground font-mono">
+                    Question {currentStep + 1} of {questions.length}
+                  </span>
+                  <span className="text-sm text-primary font-mono">
+                    {Math.round(progress)}%
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                  />
+                </div>
+                
+                {/* Step indicators */}
+                <div className="flex items-center justify-between mt-4">
+                  {questions.map((q, index) => (
+                    <motion.div
+                      key={q.id}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-mono transition-all duration-300 ${
+                        index < currentStep
+                          ? "bg-primary text-primary-foreground"
+                          : index === currentStep
+                          ? "bg-primary/20 text-primary border border-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      {index + 1}
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question card */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <DiagnosticCard
+                    icon={currentQuestion.icon}
+                    title={currentQuestion.title}
+                    subtitle={currentQuestion.subtitle}
+                    question={currentQuestion.question}
+                    options={currentQuestion.options}
+                    selectedOption={answers[currentStep]}
+                    onSelect={handleSelect}
+                  />
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Navigation */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="flex items-center justify-between mt-8"
+              >
+                <Button
+                  variant="ghost"
+                  onClick={handleBack}
+                  disabled={currentStep === 0}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Back
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={!answers[currentStep]}
+                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-emerald"
+                >
+                  {currentStep === questions.length - 1 ? "Analyze" : "Continue"}
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </motion.div>
             </motion.div>
-          ) : (
+          )}
+
+          {flowState === "analysis" && (
             <motion.div
+              key="analysis"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="glass-card glow-emerald p-8 text-center"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass-card p-6"
             >
-              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
-                <Sparkles className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-2xl font-bold mb-3">Diagnostic Complete!</h3>
-              <p className="text-muted-foreground mb-6">
-                Your Career Velocity profile has been analyzed. The multi-agent system is now generating your personalized roadmap.
-              </p>
-              <div className="space-y-3 text-left max-w-md mx-auto mb-8">
-                {Object.entries(answers).map(([step, answer]) => (
-                  <div key={step} className="flex items-start gap-3 text-sm">
-                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs text-primary font-mono">{Number(step) + 1}</span>
-                    </div>
-                    <span className="text-muted-foreground">{answer}</span>
-                  </div>
-                ))}
-              </div>
-              <Button onClick={handleReset} variant="outline" className="gap-2">
-                <RotateCcw className="w-4 h-4" />
-                Retake Diagnostic
-              </Button>
+              <AgentPanel answers={answers} onAnalysisComplete={handleAnalysisComplete} />
+            </motion.div>
+          )}
+
+          {flowState === "roadmap" && (
+            <motion.div
+              key="roadmap"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <RoadmapView answers={answers} onReset={handleReset} />
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Navigation */}
-        {!isComplete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center justify-between mt-8"
-          >
-            <Button
-              variant="ghost"
-              onClick={handleBack}
-              disabled={currentStep === 0}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Back
-            </Button>
-            <Button
-              onClick={handleNext}
-              disabled={!answers[currentStep]}
-              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-emerald"
-            >
-              {currentStep === questions.length - 1 ? "Complete" : "Continue"}
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </motion.div>
-        )}
       </div>
     </section>
   );
