@@ -18,6 +18,8 @@ import {
   GraduationCap,
   Code2,
   ListChecks,
+  Youtube,
+  Play,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -34,7 +36,8 @@ interface KnowledgeSource {
   title: string;
   source: string;
   url: string;
-  type: "course" | "documentation" | "tutorial" | "repository";
+  type: "youtube" | "course" | "documentation" | "tutorial" | "repository";
+  instructor?: string;
 }
 
 interface ForgeObjective {
@@ -124,6 +127,8 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
 
   const getSourceIcon = (type: KnowledgeSource["type"]) => {
     switch (type) {
+      case "youtube":
+        return <Youtube className="w-3 h-3" />;
       case "course":
         return <GraduationCap className="w-3 h-3" />;
       case "documentation":
@@ -137,14 +142,16 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
 
   const getSourceColor = (type: KnowledgeSource["type"]) => {
     switch (type) {
+      case "youtube":
+        return "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20";
       case "course":
-        return "bg-violet-500/10 text-violet-400 border-violet-500/20";
+        return "bg-violet-500/10 text-violet-400 border-violet-500/20 hover:bg-violet-500/20";
       case "documentation":
-        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20";
       case "tutorial":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20";
       case "repository":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20";
     }
   };
 
@@ -327,12 +334,15 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                                 rel="noopener noreferrer"
                                 className={`flex items-center gap-3 p-3 rounded-lg border transition-all hover:scale-[1.01] ${getSourceColor(source.type)}`}
                               >
-                                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${source.type === 'youtube' ? 'bg-red-500/20' : 'bg-white/10'}`}>
                                   {getSourceIcon(source.type)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium truncate">{source.title}</p>
-                                  <p className="text-xs opacity-70">{source.source}</p>
+                                  <div className="flex items-center gap-2 text-xs opacity-70">
+                                    {source.type === 'youtube' && <Play className="w-3 h-3" />}
+                                    <span>{source.instructor || source.source}</span>
+                                  </div>
                                 </div>
                                 <ExternalLink className="w-4 h-4 opacity-50" />
                               </a>

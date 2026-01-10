@@ -101,7 +101,7 @@ const PHASE3_TOOL = {
   type: "function",
   function: {
     name: "generate_weekly_sprints",
-    description: "Generate a 6-month (24-week) roadmap broken into weekly sprints",
+    description: "Generate a 6-month (24-week) roadmap broken into weekly sprints with verified, working resource links",
     parameters: {
       type: "object",
       properties: {
@@ -117,14 +117,15 @@ const PHASE3_TOOL = {
                 items: {
                   type: "object",
                   properties: {
-                    title: { type: "string", description: "Resource title" },
-                    source: { type: "string", description: "Platform like MIT OCW, CS50, official docs, GitHub" },
-                    url: { type: "string", description: "Direct URL to the resource" },
-                    type: { type: "string", enum: ["course", "documentation", "tutorial", "repository"] }
+                    title: { type: "string", description: "Exact resource/playlist title" },
+                    source: { type: "string", description: "Platform: YouTube, MIT OCW, CS50, freeCodeCamp, Coursera, official docs" },
+                    url: { type: "string", description: "VERIFIED working URL - must be real and accessible" },
+                    type: { type: "string", enum: ["youtube", "course", "documentation", "tutorial", "repository"] },
+                    instructor: { type: "string", description: "Channel name or instructor (for YouTube)" }
                   },
                   required: ["title", "source", "url", "type"]
                 },
-                description: "2-3 free, reliable learning sources"
+                description: "2-3 BEST-IN-CLASS free learning sources including YouTube playlists"
               },
               forgeObjective: {
                 type: "object",
@@ -212,7 +213,7 @@ function buildPhase3Prompt(data: RequestData): string {
   const interest = data.answers[1] || "Web Development";
   const year = data.answers[0] || "2nd year";
   
-  return `You are THE HACKWELL DYNAMIC ORCHESTRATOR - the world's most advanced Career Intelligence Agent. Create a 6-month (24-week) learning and project execution roadmap using WEEKLY SPRINTS.
+  return `You are THE HACKWELL DYNAMIC ORCHESTRATOR - the world's most advanced Career Intelligence Agent. Create a 6-month (24-week) learning roadmap using WEEKLY SPRINTS with THE BEST learning resources available.
 
 ## Target Project:
 - Title: ${project?.title || "Unknown"}
@@ -234,27 +235,55 @@ function buildPhase3Prompt(data: RequestData): string {
 - FORGE: ${data.agentInsights.forge}
 - GATEKEEPER (Risks): ${data.agentInsights.gatekeeper}
 
-## CRITICAL REQUIREMENTS:
-Generate 8 weekly sprints (representing the first 2 months of the 6-month journey). Each week MUST include:
+## CRITICAL REQUIREMENTS FOR KNOWLEDGE STACK:
+Generate 8 weekly sprints. For each week's Knowledge Stack, you MUST use ONLY these VERIFIED, WORKING resources:
 
-1. **Theme**: A clear, inspiring title (e.g., "Week 4: Mastering Asynchronous State Management")
+### PREMIUM YOUTUBE CHANNELS (use exact playlist URLs):
+- **Traversy Media**: https://www.youtube.com/@TraversyMedia/playlists
+- **Fireship**: https://www.youtube.com/@Fireship/playlists  
+- **The Coding Train**: https://www.youtube.com/@TheCodingTrain/playlists
+- **Net Ninja**: https://www.youtube.com/@NetNinja/playlists
+- **Corey Schafer** (Python): https://www.youtube.com/@coreyms/playlists
+- **Web Dev Simplified**: https://www.youtube.com/@WebDevSimplified/playlists
+- **Tech With Tim**: https://www.youtube.com/@TechWithTim/playlists
+- **freeCodeCamp.org**: https://www.youtube.com/@freecodecamp/playlists
+- **Academind**: https://www.youtube.com/@academind/playlists
+- **Programming with Mosh**: https://www.youtube.com/@programmingwithmosh/playlists
+
+### VERIFIED COURSE PLATFORMS (use exact course URLs):
+- **CS50**: https://cs50.harvard.edu/x/
+- **MIT OCW**: https://ocw.mit.edu/
+- **freeCodeCamp**: https://www.freecodecamp.org/learn/
+- **The Odin Project**: https://www.theodinproject.com/
+- **University of Helsinki Python**: https://programming-24.mooc.fi/
+- **Full Stack Open**: https://fullstackopen.com/en/
+- **Scrimba**: https://scrimba.com/learn/
+
+### OFFICIAL DOCUMENTATION (always working):
+- React: https://react.dev/learn
+- TypeScript: https://www.typescriptlang.org/docs/handbook/
+- Python: https://docs.python.org/3/tutorial/
+- MDN Web Docs: https://developer.mozilla.org/en-US/docs/Learn
+
+## EACH WEEK MUST INCLUDE:
+
+1. **Theme**: Clear, inspiring title (e.g., "Week 4: Mastering Asynchronous State Management")
 
 2. **Knowledge Stack (2-3 sources)**: 
-   - Find REAL, FREE, high-quality resources
-   - Use: MIT OCW, CS50, University of Helsinki MOOC, official documentation, freeCodeCamp, The Odin Project, high-authority GitHub repos
-   - For a ${year} student in ${interest}, match difficulty appropriately
-   - Example: For Python basics → "University of Helsinki's Python MOOC - Part 2"
+   - Include at least ONE YouTube playlist from the verified list above
+   - Include ONE official documentation or course
+   - ALL URLs must be REAL and WORKING - no made-up links
+   - Include the instructor/channel name for YouTube resources
+   - Match difficulty to ${year} ${skillLevel} level
 
 3. **Forge Objective**:
-   - Define a specific PROJECT MILESTONE that builds toward the final 6-month goal
-   - Projects must be industry-relevant (e.g., "Implement JWT Auth for your ${project?.title || 'API'}")
-   - Include 3 specific deliverables for the week
+   - Specific PROJECT MILESTONE building toward ${project?.title || 'the final project'}
+   - Include 3 specific deliverables
 
 4. **Calendar Event**:
-   - Create a single "Weekly Challenge" summary
-   - Description should include a to-do list covering the 3 major tasks
+   - Single "Weekly Challenge" summary with to-do list
 
-Make the progression logical: start with fundamentals, build complexity, integrate AI/modern tools later.`;
+Make progression logical: fundamentals → intermediate concepts → advanced integrations.`;
 }
 
 interface ToolDefinition {
@@ -386,68 +415,136 @@ function getFallbackPhase3(): { sprints: any[], totalWeeks: number } {
         week: 1,
         theme: "Week 1: Foundation & Environment Setup",
         knowledgeStack: [
-          { title: "CS50's Introduction to Computer Science", source: "Harvard/edX", url: "https://cs50.harvard.edu/x/", type: "course" },
-          { title: "Git & GitHub Fundamentals", source: "GitHub", url: "https://docs.github.com/en/get-started", type: "documentation" },
-          { title: "Developer Environment Setup Guide", source: "freeCodeCamp", url: "https://www.freecodecamp.org/news/how-to-set-up-your-development-environment/", type: "tutorial" }
+          { title: "CS50's Introduction to Computer Science 2024", source: "Harvard", url: "https://cs50.harvard.edu/x/", type: "course", instructor: "David J. Malan" },
+          { title: "Git and GitHub for Beginners - Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=RGOj5yH7evk", type: "youtube", instructor: "freeCodeCamp.org" },
+          { title: "VS Code Tutorial for Beginners", source: "YouTube", url: "https://www.youtube.com/watch?v=VqCgcpAypFQ", type: "youtube", instructor: "Traversy Media" }
         ],
         forgeObjective: {
           milestone: "Initialize project repository and development environment",
-          deliverables: ["Set up Git repository with proper .gitignore", "Configure IDE and linting tools", "Create initial project structure and README"]
+          deliverables: ["Set up Git repository with proper .gitignore", "Configure VS Code with essential extensions", "Create initial project structure and README"]
         },
         calendarEvent: {
           summary: "[Hackwell] Week 1 Challenge: Foundation Setup",
-          description: "Weekly To-Do:\n1. Complete Git & GitHub tutorial\n2. Set up development environment\n3. Initialize project repository with documentation"
+          description: "Weekly To-Do:\n1. Complete Git & GitHub crash course\n2. Set up VS Code development environment\n3. Initialize project repository with documentation"
         }
       },
       {
         week: 2,
         theme: "Week 2: Core Language Mastery",
         knowledgeStack: [
-          { title: "Python Programming MOOC", source: "University of Helsinki", url: "https://programming-24.mooc.fi/", type: "course" },
-          { title: "JavaScript.info - Modern JavaScript Tutorial", source: "JavaScript.info", url: "https://javascript.info/", type: "tutorial" },
-          { title: "TypeScript Handbook", source: "Microsoft", url: "https://www.typescriptlang.org/docs/handbook/", type: "documentation" }
+          { title: "JavaScript Full Course for Beginners", source: "YouTube", url: "https://www.youtube.com/watch?v=PkZNo7MFNFg", type: "youtube", instructor: "freeCodeCamp.org" },
+          { title: "Python Programming MOOC 2024", source: "University of Helsinki", url: "https://programming-24.mooc.fi/", type: "course", instructor: "University of Helsinki" },
+          { title: "TypeScript Tutorial for Beginners", source: "YouTube", url: "https://www.youtube.com/watch?v=BwuLxPH8IDs", type: "youtube", instructor: "Academind" }
         ],
         forgeObjective: {
           milestone: "Build core utility functions and data models",
-          deliverables: ["Implement data validation utilities", "Create type definitions/models", "Write unit tests for utilities"]
+          deliverables: ["Implement data validation utilities", "Create TypeScript type definitions", "Write unit tests for utilities"]
         },
         calendarEvent: {
           summary: "[Hackwell] Week 2 Challenge: Core Language Skills",
-          description: "Weekly To-Do:\n1. Complete language fundamentals module\n2. Implement utility functions\n3. Set up testing framework"
+          description: "Weekly To-Do:\n1. Complete JavaScript/Python fundamentals\n2. Implement utility functions with TypeScript\n3. Set up Jest testing framework"
         }
       },
       {
         week: 3,
         theme: "Week 3: API Design & Backend Foundations",
         knowledgeStack: [
-          { title: "RESTful API Design Best Practices", source: "Microsoft", url: "https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-design", type: "documentation" },
-          { title: "FastAPI Tutorial", source: "FastAPI", url: "https://fastapi.tiangolo.com/tutorial/", type: "documentation" },
-          { title: "Database Design Course", source: "MIT OCW", url: "https://ocw.mit.edu/courses/6-830-database-systems-fall-2010/", type: "course" }
+          { title: "Node.js and Express.js Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=Oe421EPjeBE", type: "youtube", instructor: "freeCodeCamp.org" },
+          { title: "REST API Design Best Practices", source: "Microsoft Learn", url: "https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-design", type: "documentation" },
+          { title: "FastAPI Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=7t2alSnE2-I", type: "youtube", instructor: "freeCodeCamp.org" }
         ],
         forgeObjective: {
           milestone: "Design and implement core API endpoints",
-          deliverables: ["Design database schema", "Implement CRUD endpoints", "Set up API documentation (Swagger/OpenAPI)"]
+          deliverables: ["Design database schema with ERD", "Implement RESTful CRUD endpoints", "Set up Swagger/OpenAPI documentation"]
         },
         calendarEvent: {
           summary: "[Hackwell] Week 3 Challenge: Backend Architecture",
-          description: "Weekly To-Do:\n1. Complete API design tutorial\n2. Implement database schema\n3. Build and test core endpoints"
+          description: "Weekly To-Do:\n1. Complete REST API course\n2. Implement database schema\n3. Build and test core endpoints"
         }
       },
       {
         week: 4,
         theme: "Week 4: Authentication & Security",
         knowledgeStack: [
-          { title: "OWASP Security Guidelines", source: "OWASP", url: "https://owasp.org/www-project-web-security-testing-guide/", type: "documentation" },
-          { title: "JWT Authentication Deep Dive", source: "Auth0", url: "https://auth0.com/learn/json-web-tokens/", type: "tutorial" },
-          { title: "OAuth 2.0 Simplified", source: "OAuth.net", url: "https://oauth.net/2/", type: "documentation" }
+          { title: "JWT Authentication Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=mbsmsi7l3r4", type: "youtube", instructor: "Web Dev Simplified" },
+          { title: "OWASP Top 10 Security Risks", source: "OWASP", url: "https://owasp.org/www-project-top-ten/", type: "documentation" },
+          { title: "Node.js Authentication From Scratch", source: "YouTube", url: "https://www.youtube.com/watch?v=F-sFp_AvHc8", type: "youtube", instructor: "Traversy Media" }
         ],
         forgeObjective: {
           milestone: "Implement secure authentication system",
-          deliverables: ["Set up JWT-based authentication", "Implement user registration/login flows", "Add role-based access control"]
+          deliverables: ["Implement JWT-based authentication", "Add password hashing with bcrypt", "Create protected API routes"]
         },
         calendarEvent: {
           summary: "[Hackwell] Week 4 Challenge: Security Implementation",
-          description: "Weekly To-Do:\n1. Study JWT and OAuth concepts\n2. Implement authentication endpoints\n3. Add protected routes and RBAC"
+          description: "Weekly To-Do:\n1. Complete JWT authentication tutorial\n2. Implement user registration & login\n3. Add route protection middleware"
+        }
+      },
+      {
+        week: 5,
+        theme: "Week 5: React Fundamentals & Component Architecture",
+        knowledgeStack: [
+          { title: "React Full Course 2024", source: "YouTube", url: "https://www.youtube.com/watch?v=bMknfKXIFA8", type: "youtube", instructor: "freeCodeCamp.org" },
+          { title: "React Official Tutorial", source: "React.dev", url: "https://react.dev/learn", type: "documentation" },
+          { title: "React Hooks Explained", source: "YouTube", url: "https://www.youtube.com/watch?v=TNhaISOUy6Q", type: "youtube", instructor: "Fireship" }
+        ],
+        forgeObjective: {
+          milestone: "Build reusable React component library",
+          deliverables: ["Create atomic UI components (Button, Input, Card)", "Implement component composition patterns", "Add Storybook documentation"]
+        },
+        calendarEvent: {
+          summary: "[Hackwell] Week 5 Challenge: React Components",
+          description: "Weekly To-Do:\n1. Complete React fundamentals course\n2. Build 10+ reusable components\n3. Document components in Storybook"
+        }
+      },
+      {
+        week: 6,
+        theme: "Week 6: State Management & Data Fetching",
+        knowledgeStack: [
+          { title: "React Query (TanStack Query) Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=r8Dg0KVnfMA", type: "youtube", instructor: "Web Dev Simplified" },
+          { title: "Zustand State Management", source: "YouTube", url: "https://www.youtube.com/watch?v=fZPgBnL2x-Q", type: "youtube", instructor: "Fireship" },
+          { title: "Full Stack Open - State Management", source: "University of Helsinki", url: "https://fullstackopen.com/en/part6", type: "course", instructor: "University of Helsinki" }
+        ],
+        forgeObjective: {
+          milestone: "Implement global state and API integration",
+          deliverables: ["Set up TanStack Query for data fetching", "Implement Zustand for global state", "Add optimistic updates and caching"]
+        },
+        calendarEvent: {
+          summary: "[Hackwell] Week 6 Challenge: State & Data",
+          description: "Weekly To-Do:\n1. Complete state management tutorials\n2. Integrate API with React Query\n3. Implement error handling and loading states"
+        }
+      },
+      {
+        week: 7,
+        theme: "Week 7: Database & Backend Integration",
+        knowledgeStack: [
+          { title: "PostgreSQL Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=qw--VYLpxG4", type: "youtube", instructor: "freeCodeCamp.org" },
+          { title: "Supabase Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=7uKQBl9uZ00", type: "youtube", instructor: "Traversy Media" },
+          { title: "Database Design Course", source: "MIT OCW", url: "https://ocw.mit.edu/courses/6-830-database-systems-fall-2010/", type: "course" }
+        ],
+        forgeObjective: {
+          milestone: "Complete database layer and real-time features",
+          deliverables: ["Design normalized database schema", "Implement database migrations", "Add real-time subscriptions"]
+        },
+        calendarEvent: {
+          summary: "[Hackwell] Week 7 Challenge: Database Mastery",
+          description: "Weekly To-Do:\n1. Complete PostgreSQL fundamentals\n2. Set up Supabase backend\n3. Implement real-time data sync"
+        }
+      },
+      {
+        week: 8,
+        theme: "Week 8: Testing & Quality Assurance",
+        knowledgeStack: [
+          { title: "React Testing Library Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=7dTTFW7yACQ", type: "youtube", instructor: "freeCodeCamp.org" },
+          { title: "Jest Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=7r4xVDI2vho", type: "youtube", instructor: "Traversy Media" },
+          { title: "Testing JavaScript Applications", source: "The Odin Project", url: "https://www.theodinproject.com/lessons/node-path-javascript-testing-basics", type: "course" }
+        ],
+        forgeObjective: {
+          milestone: "Achieve 80%+ test coverage",
+          deliverables: ["Write unit tests for all utilities", "Add integration tests for API endpoints", "Implement E2E tests with Playwright"]
+        },
+        calendarEvent: {
+          summary: "[Hackwell] Week 8 Challenge: Testing Excellence",
+          description: "Weekly To-Do:\n1. Complete testing tutorials\n2. Write comprehensive test suite\n3. Set up CI/CD with test automation"
         }
       }
     ]
