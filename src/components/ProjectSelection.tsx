@@ -67,38 +67,17 @@ const ProjectSelection = ({ targetCareer, exploreAnswers, onSelectProject, onBac
   const generateProjects = async () => {
     setIsLoading(true);
     
-    const minLoadTime = new Promise(resolve => setTimeout(resolve, 2000));
+    // Add minimum load time for better UX
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     try {
       const skillLevel = exploreAnswers.skill_level?.[0] || "beginner";
-      const constraints = exploreAnswers.constraints?.[0] || "flexible";
-      const buildIdea = exploreAnswers.build_idea?.[0] || "";
-      
-      // Try to get AI-generated projects
-      const fetchPromise = supabase.functions.invoke("generate-phase-content", {
-        body: {
-          phase: "project-selection",
-          targetCareer,
-          exploreAnswers,
-          context: {
-            skillLevel,
-            constraints,
-            buildIdea
-          }
-        }
-      });
-
-      const [{ data, error }] = await Promise.all([fetchPromise, minLoadTime]);
-
-      if (error || !data?.projects) {
-        // Use fallback projects
-        setProjects(getFallbackProjects(targetCareer, skillLevel));
-      } else {
-        setProjects(data.projects);
-      }
+      // Use fallback projects directly - no edge function call needed for project selection
+      // The real AI generation happens in Phase 2 if user goes through Targeted path
+      setProjects(getFallbackProjects(targetCareer, skillLevel));
     } catch (err) {
       console.error("Project generation error:", err);
-      setProjects(getFallbackProjects(targetCareer, exploreAnswers.skill_level?.[0] || "beginner"));
+      setProjects(getFallbackProjects(targetCareer, "beginner"));
     } finally {
       setIsLoading(false);
     }
