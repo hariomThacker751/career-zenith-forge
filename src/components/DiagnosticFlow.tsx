@@ -187,13 +187,14 @@ const DiagnosticFlow = () => {
           </p>
         </motion.div>
 
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           {flowState === "resume" && (
             <motion.div
               key="resume"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: 30, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
               className="space-y-6"
             >
               <ResumeUpload />
@@ -240,9 +241,10 @@ const DiagnosticFlow = () => {
           {flowState === "questions" && (
             <motion.div
               key="questions"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
             >
               {/* Resume mini badge if uploaded */}
               {resumeData && (
@@ -321,13 +323,17 @@ const DiagnosticFlow = () => {
               </div>
 
               {/* Question card */}
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="popLayout">
                 <motion.div
                   key={currentStep}
-                  initial={{ opacity: 0, x: 50, scale: 0.98 }}
+                  initial={{ opacity: 0, x: 60, scale: 0.95 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -50, scale: 0.98 }}
-                  transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
+                  exit={{ opacity: 0, x: -60, scale: 0.95 }}
+                  transition={{ 
+                    duration: 0.5, 
+                    ease: [0.34, 1.56, 0.64, 1],
+                    opacity: { duration: 0.3 }
+                  }}
                 >
                   <DiagnosticCard
                     icon={currentQuestion.icon}
@@ -386,9 +392,10 @@ const DiagnosticFlow = () => {
           {flowState === "analysis" && (
             <motion.div
               key="analysis"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
               className="card-elevated p-6"
             >
               <AgentPanel answers={answers} onAnalysisComplete={handleAnalysisComplete} />
@@ -398,9 +405,10 @@ const DiagnosticFlow = () => {
           {flowState === "roadmap" && (
             <motion.div
               key="roadmap"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
             >
               <RoadmapView answers={answers} onReset={handleReset} />
             </motion.div>

@@ -10,31 +10,56 @@ const HeroSection = () => {
       <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full blur-3xl opacity-25" 
            style={{ background: "linear-gradient(135deg, hsl(243 75% 90%), hsl(243 75% 95%))" }} />
       
-      {/* Floating decorative elements */}
+      {/* Floating decorative elements with smoother animations */}
       <motion.div
         className="absolute top-20 left-10 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center"
-        animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        animate={{ 
+          y: [0, -15, 0], 
+          rotate: [0, 8, 0],
+          scale: [1, 1.05, 1]
+        }}
+        transition={{ 
+          duration: 6, 
+          repeat: Infinity, 
+          ease: [0.4, 0, 0.2, 1]
+        }}
       >
         <Star className="w-4 h-4 text-primary" />
       </motion.div>
       <motion.div
         className="absolute top-32 right-16 w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center"
-        animate={{ y: [0, 10, 0], rotate: [0, -5, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        animate={{ 
+          y: [0, 12, 0], 
+          rotate: [0, -8, 0],
+          scale: [1, 1.08, 1]
+        }}
+        transition={{ 
+          duration: 7, 
+          repeat: Infinity, 
+          ease: [0.4, 0, 0.2, 1], 
+          delay: 1 
+        }}
       >
         <Sparkles className="w-5 h-5 text-secondary" />
       </motion.div>
       <motion.div
         className="absolute bottom-32 left-20 w-6 h-6 rounded-full bg-primary/20"
-        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+        animate={{ 
+          scale: [1, 1.3, 1], 
+          opacity: [0.4, 0.9, 0.4] 
+        }}
+        transition={{ 
+          duration: 4, 
+          repeat: Infinity, 
+          ease: [0.4, 0, 0.2, 1], 
+          delay: 0.5 
+        }}
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ duration: 1, ease: [0.34, 1.56, 0.64, 1] }}
         className="relative z-10 text-center max-w-4xl mx-auto"
       >
         {/* Streak Badge - Gamification element */}

@@ -178,16 +178,20 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
         return (
           <motion.div
             key={agent.id}
-            initial={{ opacity: 0, x: -30, scale: 0.95 }}
+            initial={{ opacity: 0, x: -40, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ delay: index * 0.15, type: "spring", stiffness: 200 }}
+            transition={{ 
+              delay: index * 0.18, 
+              duration: 0.6,
+              ease: [0.34, 1.56, 0.64, 1]
+            }}
             className="card-interactive p-4"
           >
             <div className="flex items-start gap-4">
               <motion.div 
                 className={`w-12 h-12 rounded-xl bg-gradient-to-br ${agent.bgGradient} flex items-center justify-center flex-shrink-0 border border-border`}
-                animate={isComplete ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.3 }}
+                animate={isComplete ? { scale: [1, 1.15, 1], rotate: [0, 5, 0] } : {}}
+                transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
               >
                 <agent.icon className="w-5 h-5 text-primary" />
               </motion.div>
@@ -211,7 +215,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={isComplete ? { opacity: 1, height: "auto" } : {}}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
                 >
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {insight}
