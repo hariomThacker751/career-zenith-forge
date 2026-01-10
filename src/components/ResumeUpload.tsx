@@ -16,9 +16,10 @@ import { cn } from "@/lib/utils";
 interface ResumeUploadProps {
   variant?: "hero" | "compact";
   className?: string;
+  onParseError?: () => void;
 }
 
-const ResumeUpload = ({ variant = "hero", className }: ResumeUploadProps) => {
+const ResumeUpload = ({ variant = "hero", className, onParseError }: ResumeUploadProps) => {
   const { 
     resumeData, 
     isUploading, 
@@ -99,8 +100,11 @@ const ResumeUpload = ({ variant = "hero", className }: ResumeUploadProps) => {
       
     } catch (err) {
       console.error("Error parsing resume:", err);
-      setError("Failed to parse resume. Please try another file.");
+      const errorMessage = err instanceof Error ? err.message : "Failed to parse resume.";
+      setError(`${errorMessage} Try Manual Mode instead.`);
       clearResume();
+      // Notify parent about parse error for Manual Recon Mode
+      onParseError?.();
     } finally {
       setIsUploading(false);
       setIsParsing(false);

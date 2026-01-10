@@ -220,7 +220,7 @@ const DiagnosticFlow = () => {
               transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
               className="space-y-6"
             >
-              <ResumeUpload />
+              <ResumeUpload onParseError={handleTriggerManualRecon} />
               
               {/* Resume synced indicator */}
               {resumeData && (
@@ -239,7 +239,7 @@ const DiagnosticFlow = () => {
                 </motion.div>
               )}
               
-              {/* Continue button */}
+              {/* Action buttons */}
               <div className="flex flex-col items-center gap-4 pt-4">
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
@@ -253,9 +253,19 @@ const DiagnosticFlow = () => {
                 </motion.div>
                 
                 {!resumeData && (
-                  <p className="text-xs text-muted-foreground">
-                    You can always upload your resume later
-                  </p>
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Having trouble with your resume?
+                    </p>
+                    <Button
+                      variant="ghost"
+                      onClick={handleTriggerManualRecon}
+                      className="text-primary hover:text-primary/80 text-sm gap-2"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      Enter Details Manually
+                    </Button>
+                  </div>
                 )}
               </div>
             </motion.div>
