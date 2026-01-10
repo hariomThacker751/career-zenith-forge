@@ -70,54 +70,65 @@
     --sidebar-ring: 158 64% 42%;
   }
 
-  /* Dark mode colors */
+  /* Dark mode colors - Hackwell Addictive Dark Theme */
+  /* Primary: #0F0F0F, Cards: #1F2937, Accent: #10B981 */
   .dark {
-    --background: 222 47% 6%;
+    /* #0F0F0F - Pure dark background */
+    --background: 0 0% 6%;
     --foreground: 210 20% 95%;
 
-    --card: 222 47% 8%;
+    /* #1F2937 - Slate cards */
+    --card: 215 28% 17%;
     --card-foreground: 210 20% 95%;
 
-    --popover: 222 47% 8%;
+    --popover: 215 28% 15%;
     --popover-foreground: 210 20% 95%;
 
-    --primary: 158 64% 50%;
-    --primary-foreground: 222 47% 6%;
+    /* #10B981 - Emerald accent */
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 243 75% 65%;
-    --secondary-foreground: 222 47% 6%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 222 40% 15%;
-    --muted-foreground: 215 16% 60%;
+    /* Muted surfaces */
+    --muted: 215 28% 12%;
+    --muted-foreground: 215 16% 55%;
 
-    --accent: 158 64% 12%;
-    --accent-foreground: 158 64% 70%;
+    --accent: 160 84% 15%;
+    --accent-foreground: 160 84% 70%;
 
-    --destructive: 0 62% 50%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 30% 18%;
-    --input: 222 30% 18%;
-    --ring: 158 64% 50%;
+    /* Subtle borders */
+    --border: 215 28% 22%;
+    --input: 215 28% 20%;
+    --ring: 160 84% 39%;
 
-    --emerald: 158 64% 50%;
-    --emerald-glow: 158 84% 60%;
-    --emerald-soft: 158 64% 12%;
+    /* Emerald tokens - #10B981 based */
+    --emerald: 160 84% 39%;
+    --emerald-glow: 160 84% 50%;
+    --emerald-soft: 160 84% 12%;
+    
+    /* Indigo accent */
     --indigo: 243 75% 65%;
     --indigo-glow: 243 75% 75%;
     --indigo-soft: 243 75% 12%;
 
-    --surface-soft: 222 47% 10%;
-    --surface-hover: 222 47% 14%;
+    /* Surface variations */
+    --surface-soft: 215 28% 10%;
+    --surface-hover: 215 28% 14%;
 
-    --sidebar-background: 222 47% 6%;
+    /* Sidebar */
+    --sidebar-background: 0 0% 6%;
     --sidebar-foreground: 210 20% 95%;
-    --sidebar-primary: 158 64% 50%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 40% 15%;
+    --sidebar-primary: 160 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 28% 15%;
     --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 222 30% 18%;
-    --sidebar-ring: 158 64% 50%;
+    --sidebar-border: 215 28% 22%;
+    --sidebar-ring: 160 84% 39%;
   }
 }
 
