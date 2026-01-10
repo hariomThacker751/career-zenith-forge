@@ -133,6 +133,15 @@ export const WeeklyMissionCard = ({
     { label: "Generating professional feedback...", icon: FileText },
   ];
 
+  // Reset to tasks phase when weekNumber changes (new week unlocked)
+  useEffect(() => {
+    console.log(`[WeeklyMissionCard] Week changed to: ${weekNumber}, resetting to tasks phase`);
+    setPhase("tasks");
+    setGithubUrl("");
+    setResult(null);
+    setScanStep(0);
+  }, [weekNumber]);
+
   // Log phase transitions for debugging
   useEffect(() => {
     console.log(`[WeeklyMissionCard] Phase changed to: ${phase}`);
