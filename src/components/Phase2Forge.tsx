@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Hammer,
@@ -11,139 +11,75 @@ import {
   Zap,
   CheckCircle2,
   ArrowRight,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { usePhase, ProjectPRD } from "@/contexts/PhaseContext";
 import { useResume } from "@/contexts/ResumeContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Phase2ForgeProps {
   answers: Record<number, string>;
 }
 
-const generateProjects = (
-  answers: Record<number, string>,
-  skills: string[]
-): ProjectPRD[] => {
-  const interest = answers[1] || "";
-  const goal = answers[4] || "";
-
-  const projects: ProjectPRD[] = [];
-
-  if (interest.includes("AI")) {
-    projects.push({
-      title: "LLM-Powered Legal Document Auditor",
-      description:
-        "Build an AI system that analyzes legal contracts, identifies risky clauses, and suggests improvements. Uses RAG architecture with a vector database for context retrieval.",
-      techStack: ["Python", "LangChain", "Pinecone", "FastAPI", "React", "GPT-4"],
-      features: [
-        "PDF/DOCX contract upload and parsing",
-        "Clause-by-clause risk analysis",
-        "Suggested revisions with AI explanations",
-        "Comparison with industry-standard templates",
-        "Export audit report as PDF",
-      ],
-      timeline: "4-6 weeks",
-      difficulty: "Advanced",
-    });
-
-    projects.push({
-      title: "Autonomous Web Scraper for Green Energy Credits",
-      description:
-        "Create an intelligent scraping system that monitors renewable energy credit markets, tracks prices across exchanges, and predicts optimal buying/selling times using ML.",
-      techStack: ["Python", "Playwright", "PostgreSQL", "Scikit-learn", "Next.js", "Chart.js"],
-      features: [
-        "Multi-source data aggregation",
-        "Real-time price tracking dashboard",
-        "ML-based price prediction model",
-        "Alert system for price thresholds",
-        "Historical trend analysis",
-      ],
-      timeline: "5-7 weeks",
-      difficulty: "Advanced",
-    });
-  }
-
-  if (interest.includes("web") || interest.includes("app") || !interest.includes("AI")) {
-    projects.push({
-      title: "Real-Time Collaborative Code Review Platform",
-      description:
-        "Build a platform where developers can share code snippets, get real-time feedback, and conduct pair programming sessions with WebRTC-powered video.",
-      techStack: ["Next.js 15", "TypeScript", "Supabase", "WebRTC", "Monaco Editor", "Tailwind"],
-      features: [
-        "Live code sharing with syntax highlighting",
-        "Real-time cursor tracking",
-        "Video/audio chat integration",
-        "Code annotation and commenting",
-        "Session recording and playback",
-      ],
-      timeline: "5-6 weeks",
-      difficulty: "Advanced",
-    });
-
-    projects.push({
-      title: "Developer Portfolio with AI-Generated Case Studies",
-      description:
-        "A next-gen portfolio site that uses AI to generate detailed case studies from your GitHub repos, complete with architecture diagrams and impact metrics.",
-      techStack: ["Next.js 15", "TypeScript", "OpenAI API", "Mermaid.js", "Framer Motion"],
-      features: [
-        "GitHub integration for repo analysis",
-        "AI-generated project descriptions",
-        "Auto-generated architecture diagrams",
-        "Visitor analytics dashboard",
-        "Contact form with smart filtering",
-      ],
-      timeline: "3-4 weeks",
-      difficulty: "Intermediate",
-    });
-  }
-
-  if (interest.includes("automates") || interest.includes("data")) {
-    projects.push({
-      title: "Personal Finance AI with Bank Integration",
-      description:
-        "Build a comprehensive finance tracker that connects to bank accounts via Plaid, categorizes transactions using ML, and provides personalized saving recommendations.",
-      techStack: ["React", "Node.js", "Plaid API", "TensorFlow.js", "PostgreSQL", "D3.js"],
-      features: [
-        "Secure bank account linking",
-        "Smart transaction categorization",
-        "Spending pattern analysis",
-        "Budget recommendations with AI",
-        "Investment tracking dashboard",
-      ],
-      timeline: "6-8 weeks",
-      difficulty: "Advanced",
-    });
-  }
-
-  // Fallback project
-  if (projects.length < 2) {
-    projects.push({
-      title: "Full-Stack SaaS Starter with Payments",
-      description:
-        "Create a production-ready SaaS boilerplate with authentication, team management, Stripe subscriptions, and a beautiful landing page.",
-      techStack: ["Next.js 15", "Supabase", "Stripe", "Tailwind", "Resend", "Vercel"],
-      features: [
-        "Email/social authentication",
-        "Team invitations and roles",
-        "Stripe subscription handling",
-        "Usage-based billing support",
-        "Admin dashboard",
-      ],
-      timeline: "4-5 weeks",
-      difficulty: "Intermediate",
-    });
-  }
-
-  return projects.slice(0, 3);
-};
-
 const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
-  const { completePhase2 } = usePhase();
+  const { completePhase2, phaseData } = usePhase();
   const { resumeData } = useResume();
   const [selectedProject, setSelectedProject] = useState<ProjectPRD | null>(null);
   const [showPRD, setShowPRD] = useState(false);
+  const [projects, setProjects] = useState<ProjectPRD[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const projects = generateProjects(answers, resumeData?.skills || []);
+  const fetchProjects = async () => {
+    if (!phaseData.agentInsights) {
+      setError("Agent insights not available. Please restart the analysis.");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("generate-phase-content", {
+        body: {
+          phase: 2,
+          agentInsights: phaseData.agentInsights,
+          answers,
+          resumeSkills: resumeData?.skills || [],
+          resumeProjects: resumeData?.projects || [],
+          selectedLearningPaths: phaseData.phase1.selectedPaths,
+        },
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.projects && Array.isArray(data.projects)) {
+        setProjects(data.projects);
+      } else {
+        throw new Error("Invalid response format");
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+      setError(err instanceof Error ? err.message : "Failed to generate projects");
+      toast.error("Failed to generate project ideas");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   const handleSelectProject = (project: ProjectPRD) => {
     setSelectedProject(project);
@@ -186,12 +122,55 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
           <span className="text-gradient-sunset">Build Your Industry Project</span>
         </h2>
         <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-          No "Todo Apps" here. Choose a 2026-relevant project that showcases real
-          engineering skills and solves actual problems.
+          No "Todo Apps" here. AI-generated 2026-relevant projects that showcase real
+          engineering skills and solve actual problems.
         </p>
       </motion.div>
 
-      {!showPRD ? (
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          >
+            <Loader2 className="w-8 h-8 text-primary" />
+          </motion.div>
+          <p className="text-muted-foreground text-sm">
+            THE FORGE is crafting your project ideas...
+          </p>
+          <div className="flex gap-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-2 h-2 rounded-full bg-primary"
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center py-12 space-y-4"
+        >
+          <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-center max-w-md">
+            <p className="text-destructive font-medium mb-2">Failed to load projects</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+          <Button onClick={fetchProjects} variant="outline" className="gap-2">
+            <RefreshCw className="w-4 h-4" />
+            Try Again
+          </Button>
+        </motion.div>
+      )}
+
+      {!isLoading && !error && !showPRD && (
         <>
           {/* Project Options */}
           <div className="space-y-4">
@@ -256,8 +235,20 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
               </motion.div>
             ))}
           </div>
+
+          {/* AI Generated Badge */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+          >
+            <Sparkles className="w-3 h-3 text-primary" />
+            <span>Generated by THE FORGE agent based on your profile</span>
+          </motion.div>
         </>
-      ) : (
+      )}
+
+      {!isLoading && !error && showPRD && selectedProject && (
         /* PRD View */
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
@@ -273,7 +264,7 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
               <p className="text-xs font-bold text-primary uppercase tracking-wider">
                 Product Requirement Document
               </p>
-              <h3 className="text-xl font-bold">{selectedProject?.title}</h3>
+              <h3 className="text-xl font-bold">{selectedProject.title}</h3>
             </div>
           </div>
 
@@ -283,7 +274,7 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
               <Zap className="w-4 h-4 text-primary" />
               Project Overview
             </h4>
-            <p className="text-muted-foreground">{selectedProject?.description}</p>
+            <p className="text-muted-foreground">{selectedProject.description}</p>
           </div>
 
           {/* Tech Stack */}
@@ -293,7 +284,7 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
               Technology Stack
             </h4>
             <div className="flex flex-wrap gap-2">
-              {selectedProject?.techStack.map((tech) => (
+              {selectedProject.techStack.map((tech) => (
                 <span
                   key={tech}
                   className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-medium"
@@ -311,7 +302,7 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
               Core Features
             </h4>
             <div className="space-y-2">
-              {selectedProject?.features.map((feature, idx) => (
+              {selectedProject.features.map((feature, idx) => (
                 <motion.div
                   key={feature}
                   initial={{ opacity: 0, x: -10 }}
@@ -331,7 +322,7 @@ const Phase2Forge = ({ answers }: Phase2ForgeProps) => {
             <Clock className="w-6 h-6 text-primary" />
             <div>
               <p className="font-bold">Estimated Timeline</p>
-              <p className="text-sm text-muted-foreground">{selectedProject?.timeline}</p>
+              <p className="text-sm text-muted-foreground">{selectedProject.timeline}</p>
             </div>
           </div>
 
