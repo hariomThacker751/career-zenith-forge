@@ -90,14 +90,44 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
   // GitHub submit handler
   const handleGitHubSubmit = async (url: string) => {
     if (isDemo) {
-      await new Promise(resolve => setTimeout(resolve, 4000));
-      const passed = Math.random() > 0.3;
+      // Enhanced demo evaluation with AI-like feedback
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      const passed = Math.random() > 0.25;
+      const score = passed ? Math.floor(Math.random() * 15) + 78 : Math.floor(Math.random() * 25) + 45;
+      
       return {
         passed,
-        score: passed ? Math.floor(Math.random() * 20) + 80 : Math.floor(Math.random() * 30) + 40,
+        score,
         feedback: passed
-          ? "Excellent work! Your code structure is clean and follows best practices."
-          : "Good effort, but there are areas that need improvement.",
+          ? "Great job! Your implementation demonstrates solid understanding of the week's concepts."
+          : "Good progress, but there are key areas that need attention before moving forward.",
+        strengths: passed ? [
+          "Clean code structure with good separation of concerns",
+          "Proper use of TypeScript types throughout the project",
+          "Well-documented functions with clear naming conventions",
+          "Effective error handling patterns implemented",
+        ] : [
+          "Good attempt at implementing core functionality",
+          "Basic project structure is in place",
+        ],
+        improvements: passed ? [
+          "Consider adding more comprehensive unit tests",
+          "Some functions could be broken down into smaller pieces",
+        ] : [
+          "Error handling needs to be more robust",
+          "Add input validation for user-facing functions",
+          "Include proper documentation for public APIs",
+          "Consider using more descriptive variable names",
+        ],
+        codeQuality: {
+          structure: passed ? Math.floor(Math.random() * 15) + 80 : Math.floor(Math.random() * 20) + 50,
+          readability: passed ? Math.floor(Math.random() * 12) + 82 : Math.floor(Math.random() * 25) + 55,
+          bestPractices: passed ? Math.floor(Math.random() * 10) + 78 : Math.floor(Math.random() * 20) + 48,
+          documentation: passed ? Math.floor(Math.random() * 18) + 70 : Math.floor(Math.random() * 30) + 40,
+        },
+        professionalReview: passed
+          ? `This submission shows strong foundational skills and attention to detail. The code organization follows industry-standard patterns, and the implementation demonstrates a good grasp of the concepts covered this week.\n\nI particularly appreciated the consistent coding style and the effort put into making the code readable. The use of TypeScript is effective, though there's room to leverage more advanced type features in future iterations.\n\nFor next week, I'd recommend exploring testing strategies and continuous integration practices to further strengthen your development workflow.`
+          : `While this submission shows effort and understanding of the basic concepts, there are several areas that need improvement before moving forward.\n\nThe main concerns are around code robustness - specifically error handling and edge case management. Production code needs to gracefully handle unexpected inputs and failure scenarios.\n\nI'd suggest revisiting the course materials on defensive programming and adding comprehensive error boundaries before resubmitting.`,
       };
     }
     return submitProject(url);
@@ -227,6 +257,9 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
             <GitHubEvaluationTerminal
               onSubmit={handleGitHubSubmit}
               onNextWeek={handleNextWeek}
+              weekNumber={currentWeek}
+              weekTheme={sprintTheme}
+              tasks={displayTasks.map(t => t.title)}
             />
           </div>
 

@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.generate-phase-content]
 verify_jwt = false
+
+[functions.evaluate-repo]
+verify_jwt = false

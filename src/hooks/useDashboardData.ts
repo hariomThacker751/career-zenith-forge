@@ -196,6 +196,15 @@ export function useDashboardData(userId?: string) {
     passed: boolean;
     score: number;
     feedback: string;
+    strengths?: string[];
+    improvements?: string[];
+    codeQuality?: {
+      structure: number;
+      readability: number;
+      bestPractices: number;
+      documentation: number;
+    };
+    professionalReview?: string;
   }> => {
     if (!userId || !state.currentSprint) {
       return { passed: false, score: 0, feedback: "No active sprint" };
@@ -224,17 +233,32 @@ export function useDashboardData(userId?: string) {
         metadata: { submission_id: submission.id, github_url: githubUrl } as unknown as Json,
       });
 
-      // TODO: Call AI evaluation edge function
-      // For now, simulate evaluation
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Get task titles for context
+      const taskTitles = state.tasks.map(t => t.title);
 
-      const passed = Math.random() > 0.3;
-      const score = passed
-        ? Math.floor(Math.random() * 20) + 80
-        : Math.floor(Math.random() * 30) + 40;
-      const feedback = passed
-        ? "Excellent work! Your code structure is clean and follows best practices."
-        : "Good effort, but some areas need improvement. Focus on error handling.";
+      // Call AI evaluation edge function
+      const { data: evalResult, error: evalError } = await supabase.functions.invoke("evaluate-repo", {
+        body: {
+          githubUrl,
+          weekNumber: state.currentSprint.week_number,
+          weekTheme: state.currentSprint.theme,
+          tasks: taskTitles,
+        },
+      });
+
+      if (evalError) throw evalError;
+
+      // Check for API errors in response
+      if (evalResult.error) {
+        toast({
+          title: "Evaluation Error",
+          description: evalResult.error,
+          variant: "destructive",
+        });
+        return { passed: false, score: 0, feedback: evalResult.error };
+      }
+
+      const { passed, score, feedback, strengths, improvements, codeQuality, professionalReview } = evalResult;
 
       // Update submission with results
       await supabase
@@ -252,17 +276,22 @@ export function useDashboardData(userId?: string) {
         user_id: userId,
         agent_type: "gatekeeper",
         message: passed
-          ? `Project passed with Hackwell Score: ${score}!`
-          : `Project needs work. Score: ${score}`,
-        metadata: { submission_id: submission.id, score, passed } as unknown as Json,
+          ? `🎉 Project passed with Hackwell Score: ${score}!`
+          : `📝 Project needs work. Score: ${score}/100`,
+        metadata: { submission_id: submission.id, score, passed, strengths, improvements } as unknown as Json,
       });
 
-      return { passed, score, feedback };
+      return { passed, score, feedback, strengths, improvements, codeQuality, professionalReview };
     } catch (error) {
       console.error("Error submitting project:", error);
+      toast({
+        title: "Evaluation Failed",
+        description: "Could not evaluate repository. Please try again.",
+        variant: "destructive",
+      });
       return { passed: false, score: 0, feedback: "Evaluation failed. Please try again." };
     }
-  }, [userId, state.currentSprint]);
+  }, [userId, state.currentSprint, state.tasks, toast]);
 
   // Unlock next week
   const unlockNextWeek = useCallback(async () => {
