@@ -166,13 +166,16 @@ function buildPhase1Prompt(data: RequestData): string {
 This user has already selected their target career. All learning paths MUST be specifically tailored to help them become a ${data.targetCareer}.`
     : "";
 
+  // Handle both old format (hobbies, interests, etc.) and new format (academic_position, skill_level, etc.)
   const exploreContext = data.exploreAnswers
-    ? `\n## Explore Mode Quiz Answers:
-- Hobbies: ${data.exploreAnswers.hobbies?.join(", ") || "Not specified"}
-- Interests: ${data.exploreAnswers.interests?.join(", ") || "Not specified"}  
+    ? `\n## Explore Mode Profile:
+- Academic Position: ${data.exploreAnswers.academic_position?.join(", ") || data.exploreAnswers.year?.join(", ") || "Not specified"}
+- Skill Level: ${data.exploreAnswers.skill_level?.join(", ") || "Not specified"}
+- Work Energy: ${data.exploreAnswers.work_energy?.join(", ") || data.exploreAnswers.interests?.join(", ") || "Not specified"}
+- Constraints: ${data.exploreAnswers.constraints?.join(", ") || "Flexible"}
+- Build Idea: ${data.exploreAnswers.build_idea?.join(", ") || "Not specified"}
 - Current Skills: ${data.exploreAnswers.skills?.join(", ") || "Not specified"}
-- Branch/Major: ${data.exploreAnswers.branch?.join(", ") || "Not specified"}
-- Year: ${data.exploreAnswers.year?.join(", ") || "Not specified"}`
+- Branch/Major: ${data.exploreAnswers.branch?.join(", ") || "Not specified"}`
     : "";
 
   return `You are an expert career advisor. Based on the following AI agent insights and user profile, generate 3-5 highly personalized learning paths to close skill gaps.
@@ -582,6 +585,22 @@ function getFallbackPhase3(): { sprints: any[], totalWeeks: number } {
   };
 }
 
+// Generate synthetic agent insights from Explore Mode data
+function buildExploreInsights(targetCareer: string, exploreAnswers: Record<string, string[]>): AgentInsights {
+  const academicPosition = exploreAnswers.academic_position?.[0] || "student";
+  const skillLevel = exploreAnswers.skill_level?.[0] || "beginner";
+  const workEnergy = exploreAnswers.work_energy?.[0] || "logic";
+  const constraints = exploreAnswers.constraints?.[0] || "flexible";
+  const buildIdea = exploreAnswers.build_idea?.[0] || "a useful tool";
+  
+  return {
+    profiler: `User is a ${academicPosition} at ${skillLevel} level. Their work energy is in ${workEnergy}. They want to build: "${buildIdea}". Target career: ${targetCareer}.`,
+    pulse: `${targetCareer} roles are in high demand. Key trends include AI integration, cloud-native development, and real-time systems. Focus on modern tech stacks.`,
+    forge: `Recommended projects for ${targetCareer}: Build portfolio pieces that demonstrate ${workEnergy} skills. Start with fundamentals, then tackle real-world problems.`,
+    gatekeeper: `Constraints: ${constraints}. Risk mitigation: Start with core fundamentals before advanced topics. Build incrementally to avoid burnout.`
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -589,10 +608,16 @@ serve(async (req) => {
 
   try {
     const data: RequestData = await req.json();
-    const { phase, agentInsights } = data;
+    let { phase, agentInsights, targetCareer, exploreAnswers } = data;
+
+    // For Explore Mode: generate synthetic insights from explore answers
+    if (!agentInsights && targetCareer && exploreAnswers) {
+      agentInsights = buildExploreInsights(targetCareer, exploreAnswers);
+      data.agentInsights = agentInsights;
+    }
 
     if (!agentInsights) {
-      throw new Error("Agent insights are required");
+      throw new Error("Agent insights are required (either from analysis or Explore Mode)");
     }
 
     let result: any;

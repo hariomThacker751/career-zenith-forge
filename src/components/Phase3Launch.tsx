@@ -72,8 +72,12 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
   const project = phaseData.phase2.project;
 
   const fetchSprints = async () => {
-    if (!phaseData.agentInsights || !project) {
-      setError("Missing project or agent insights.");
+    // Allow either agent insights OR explore mode data (targetCareer + exploreAnswers)
+    const hasAgentInsights = !!phaseData.agentInsights;
+    const hasExploreData = !!phaseData.targetCareer && !!phaseData.exploreAnswers;
+    
+    if ((!hasAgentInsights && !hasExploreData) || !project) {
+      setError("Missing project or profile data.");
       setIsLoading(false);
       return;
     }
