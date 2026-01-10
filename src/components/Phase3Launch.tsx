@@ -22,6 +22,7 @@ import {
   Play,
   Download,
   Award,
+  LayoutDashboard,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -29,6 +30,7 @@ import { usePhase } from "@/contexts/PhaseContext";
 import { useResume } from "@/contexts/ResumeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 interface Phase3LaunchProps {
   answers: Record<number, string>;
@@ -661,13 +663,15 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                   transition={{ delay: 0.6 }}
                   className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4"
                 >
-                  <Button
-                    size="lg"
-                    className="gap-2 bg-gradient-to-r from-primary to-emerald-500 text-white shadow-lg shadow-primary/25"
-                  >
-                    <Download className="w-5 h-5" />
-                    Download Certificate
-                  </Button>
+                  <Link to="/dashboard">
+                    <Button
+                      size="lg"
+                      className="gap-2 bg-gradient-to-r from-primary to-emerald-500 text-white shadow-lg shadow-primary/25"
+                    >
+                      <LayoutDashboard className="w-5 h-5" />
+                      Go to Dashboard
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     size="lg"

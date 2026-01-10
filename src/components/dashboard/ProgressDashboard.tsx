@@ -4,9 +4,10 @@ import { GlobalProgressHeader } from "./GlobalProgressHeader";
 import { WeeklyMissionCard } from "./WeeklyMissionCard";
 import { ActivityFeed } from "./ActivityFeed";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { Loader2, AlertCircle, Coins, ArrowLeft } from "lucide-react";
+import { Loader2, AlertCircle, Coins, ArrowLeft, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Demo data for when no user is authenticated
 const demoTasks = [
@@ -29,6 +30,9 @@ interface ProgressDashboardProps {
 }
 
 export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+  
   const {
     progress,
     currentSprint,
@@ -183,10 +187,21 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
           </Link>
           
           {!isDemo && (
-            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
-              <Coins className="w-4 h-4 text-amber-400" />
-              <span className="text-sm font-semibold text-foreground">{credits}</span>
-              <span className="text-xs text-muted-foreground">credits</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
+                <Coins className="w-4 h-4 text-amber-400" />
+                <span className="text-sm font-semibold text-foreground">{credits}</span>
+                <span className="text-xs text-muted-foreground">credits</span>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => signOut().then(() => navigate("/auth"))}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
             </div>
           )}
         </div>
@@ -212,9 +227,11 @@ export const ProgressDashboard = ({ userId }: ProgressDashboardProps) => {
                     <p className="text-xs text-muted-foreground">Complete tasks and submit a repo to see the AI evaluation flow</p>
                   </div>
                 </div>
-                <Button size="sm" className="bg-primary hover:bg-primary/90">
-                  Sign In
-                </Button>
+                <Link to="/auth">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90">
+                    Sign In
+                  </Button>
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
