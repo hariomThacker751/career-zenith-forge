@@ -71,32 +71,48 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
   const resumeProjects = resumeData?.projects || [];
   const resumeExperience = resumeData?.experience || [];
 
-  const analyzeWithAgent = useCallback(async (agentType: AgentType): Promise<string> => {
-    const { data, error } = await supabase.functions.invoke("career-agents", {
-      body: {
-        agentType,
-        answers,
-        resumeSkills,
-        resumeProjects,
-        resumeExperience,
-      },
-    });
+  const analyzeWithAgent = useCallback(async (agentType: AgentType, retries = 2): Promise<string> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const { data, error } = await supabase.functions.invoke("career-agents", {
+          body: {
+            agentType,
+            answers,
+            resumeSkills,
+            resumeProjects,
+            resumeExperience,
+          },
+        });
 
-    if (error) {
-      console.error(`Agent ${agentType} error:`, error);
-      throw new Error(error.message || "Analysis failed");
+        if (error) {
+          console.error(`Agent ${agentType} error:`, error);
+          throw new Error(error.message || "Analysis failed");
+        }
+
+        if (data?.error) {
+          // If rate limited, wait and retry
+          if (data.error.includes("Rate limit") && attempt < retries) {
+            console.log(`Rate limited on ${agentType}, retrying in 2s...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          throw new Error(data.error);
+        }
+
+        return data?.insight || "Analysis complete.";
+      } catch (err) {
+        if (attempt < retries) {
+          console.log(`Retrying ${agentType} after error...`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          continue;
+        }
+        throw err;
+      }
     }
-
-    if (data?.error) {
-      throw new Error(data.error);
-    }
-
-    return data?.insight || "Analysis complete.";
+    throw new Error("Max retries exceeded");
   }, [answers, resumeSkills, resumeProjects, resumeExperience]);
 
-  const runAgentAnalysis = useCallback(async (agent: Agent, delay: number) => {
-    await new Promise(resolve => setTimeout(resolve, delay));
-    
+  const runSingleAgent = useCallback(async (agent: Agent): Promise<void> => {
     setProcessingAgents(prev => new Set([...prev, agent.id]));
 
     try {
@@ -143,15 +159,30 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
       return newSet;
     });
 
-    await runAgentAnalysis(agent, 0);
-  }, [runAgentAnalysis]);
+    await runSingleAgent(agent);
+  }, [runSingleAgent]);
 
+  // Run agents SEQUENTIALLY to avoid rate limits
   useEffect(() => {
-    // Run all agents with staggered delays
-    agents.forEach((agent, index) => {
-      runAgentAnalysis(agent, index * 800);
-    });
-  }, [runAgentAnalysis]);
+    let cancelled = false;
+
+    const runAllAgentsSequentially = async () => {
+      for (const agent of agents) {
+        if (cancelled) break;
+        await runSingleAgent(agent);
+        // Wait 1.5 seconds between agents to respect rate limits
+        if (!cancelled) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+    };
+
+    runAllAgentsSequentially();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [runSingleAgent]);
 
   useEffect(() => {
     if (completedAgents.size === agents.length) {
