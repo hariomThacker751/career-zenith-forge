@@ -171,23 +171,37 @@ const CareerResults = ({ quizAnswers, onSelectCareer, onBack }: CareerResultsPro
     setIsLoading(true);
     setError(null);
     
+    // Add a minimum loading time for better UX
+    const minLoadTime = new Promise(resolve => setTimeout(resolve, 2500));
+    
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("career-agents", {
+      const fetchPromise = supabase.functions.invoke("career-agents", {
         body: {
           type: "career-mapping",
           quizAnswers
         }
       });
 
+      const [{ data, error: fnError }] = await Promise.all([fetchPromise, minLoadTime]);
+
       if (fnError) throw fnError;
-      if (data?.careers) {
+      
+      // Handle rate limiting specifically
+      if (data?.error?.includes("Rate limit")) {
+        console.warn("Rate limited, using smart fallback");
+        setCareers(getFallbackCareers(quizAnswers));
+        return;
+      }
+      
+      if (data?.careers && data.careers.length > 0) {
         setCareers(data.careers);
       } else {
-        throw new Error("No careers returned");
+        // No error, but no careers - use fallback
+        setCareers(getFallbackCareers(quizAnswers));
       }
     } catch (err) {
       console.error("Career mapping error:", err);
-      setError("Failed to analyze career paths. Using fallback recommendations.");
+      // Use smart fallback silently without showing error to user
       setCareers(getFallbackCareers(quizAnswers));
     } finally {
       setIsLoading(false);
