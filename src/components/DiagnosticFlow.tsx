@@ -7,6 +7,9 @@ import {
   Clock, 
   Target,
   ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  Flame
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
@@ -132,6 +135,7 @@ const DiagnosticFlow = () => {
 
   const currentQuestion = questions[currentStep];
   const progress = ((currentStep + 1) / questions.length) * 100;
+  const answeredCount = Object.keys(answers).length;
 
   return (
     <section className="relative py-16 px-6">
@@ -142,8 +146,22 @@ const DiagnosticFlow = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
+          <motion.div 
+            className="pill-badge mb-4 mx-auto w-fit"
+            whileHover={{ scale: 1.02 }}
+          >
+            {flowState === "questions" && <Sparkles className="w-4 h-4 text-primary" />}
+            {flowState === "analysis" && <Flame className="w-4 h-4 text-orange-500" />}
+            {flowState === "roadmap" && <Target className="w-4 h-4 text-primary" />}
+            <span>
+              {flowState === "questions" && `${answeredCount}/5 Questions Answered`}
+              {flowState === "analysis" && "AI Analysis in Progress"}
+              {flowState === "roadmap" && "Roadmap Ready"}
+            </span>
+          </motion.div>
+          
           <h2 className="text-2xl md:text-3xl font-bold mb-3">
-            <span className="text-gradient-emerald">
+            <span className="text-gradient-sunset">
               {flowState === "questions" && "Universal Diagnostic"}
               {flowState === "analysis" && "Analyzing Your Profile"}
               {flowState === "roadmap" && "Your Career Roadmap"}
@@ -164,42 +182,65 @@ const DiagnosticFlow = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              {/* Progress bar */}
+              {/* XP-style Progress bar */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground font-mono">
+                  <span className="text-sm text-muted-foreground font-medium">
                     Question {currentStep + 1} of {questions.length}
                   </span>
-                  <span className="text-sm text-primary font-mono">
-                    {Math.round(progress)}%
-                  </span>
+                  <motion.span 
+                    key={progress}
+                    initial={{ scale: 1.2 }}
+                    animate={{ scale: 1 }}
+                    className="text-sm text-primary font-bold"
+                  >
+                    {Math.round(progress)}% Complete
+                  </motion.span>
                 </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="xp-bar">
                   <motion.div
-                    className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
+                    className="xp-bar-fill"
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
                   />
                 </div>
                 
                 {/* Step indicators */}
-                <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center justify-between mt-6">
                   {questions.map((q, index) => (
                     <motion.div
                       key={q.id}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-mono transition-all duration-300 ${
+                      className={`relative w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                         index < currentStep
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-primary text-white shadow-lg shadow-primary/20"
                           : index === currentStep
-                          ? "bg-primary/20 text-primary border border-primary"
+                          ? "bg-gradient-to-br from-primary/20 to-secondary/20 text-primary border-2 border-primary"
                           : "bg-muted text-muted-foreground"
                       }`}
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: index * 0.1 }}
+                      transition={{ delay: index * 0.08, type: "spring" }}
+                      whileHover={{ scale: 1.1 }}
                     >
-                      {index + 1}
+                      {index < currentStep ? (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring" }}
+                        >
+                          ✓
+                        </motion.div>
+                      ) : (
+                        index + 1
+                      )}
+                      {index === currentStep && (
+                        <motion.div
+                          className="absolute -inset-1 rounded-xl border-2 border-primary/30"
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      )}
                     </motion.div>
                   ))}
                 </div>
@@ -209,10 +250,10 @@ const DiagnosticFlow = () => {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentStep}
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0, x: 50, scale: 0.98 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -50, scale: 0.98 }}
+                  transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
                 >
                   <DiagnosticCard
                     icon={currentQuestion.icon}
@@ -237,18 +278,33 @@ const DiagnosticFlow = () => {
                   variant="ghost"
                   onClick={handleBack}
                   disabled={currentStep === 0}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground gap-2"
                 >
+                  <ChevronLeft className="w-4 h-4" />
                   Back
                 </Button>
-                <Button
-                  onClick={handleNext}
-                  disabled={!answers[currentStep]}
-                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground glow-emerald"
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  {currentStep === questions.length - 1 ? "Analyze" : "Continue"}
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+                  <Button
+                    onClick={handleNext}
+                    disabled={!answers[currentStep]}
+                    className="gap-2 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white shadow-lg shadow-primary/25 px-6"
+                  >
+                    {currentStep === questions.length - 1 ? (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Analyze My Profile
+                      </>
+                    ) : (
+                      <>
+                        Continue
+                        <ChevronRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
               </motion.div>
             </motion.div>
           )}
@@ -259,7 +315,7 @@ const DiagnosticFlow = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card p-6"
+              className="card-elevated p-6"
             >
               <AgentPanel answers={answers} onAnalysisComplete={handleAnalysisComplete} />
             </motion.div>

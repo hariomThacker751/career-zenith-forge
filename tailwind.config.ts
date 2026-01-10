@@ -61,15 +61,16 @@ export default {
         emerald: {
           DEFAULT: "hsl(var(--emerald))",
           glow: "hsl(var(--emerald-glow))",
+          soft: "hsl(var(--emerald-soft))",
         },
         indigo: {
           DEFAULT: "hsl(var(--indigo))",
           glow: "hsl(var(--indigo-glow))",
+          soft: "hsl(var(--indigo-soft))",
         },
-        slate: {
-          deep: "hsl(var(--slate-deep))",
-          surface: "hsl(var(--slate-surface))",
-          elevated: "hsl(var(--slate-elevated))",
+        surface: {
+          soft: "hsl(var(--surface-soft))",
+          hover: "hsl(var(--surface-hover))",
         },
       },
       borderRadius: {

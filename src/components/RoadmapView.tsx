@@ -9,7 +9,10 @@ import {
   FileText,
   GraduationCap,
   Zap,
-  Target
+  Target,
+  Sparkles,
+  Check,
+  ArrowLeft
 } from "lucide-react";
 
 interface RoadmapViewProps {
@@ -203,10 +206,15 @@ const RoadmapView = ({ answers, onReset }: RoadmapViewProps) => {
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-full glass-card">
+        <motion.div 
+          className="pill-badge mb-4 mx-auto w-fit"
+          initial={{ scale: 0.9 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring" }}
+        >
           <Target className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">Your Personalized Roadmap</span>
-        </div>
+          <span>Your Personalized Roadmap</span>
+        </motion.div>
         <h2 className="text-2xl font-bold">
           <span className="text-gradient-emerald">Career Velocity</span>
           <span className="text-foreground"> Activated</span>
@@ -216,32 +224,51 @@ const RoadmapView = ({ answers, onReset }: RoadmapViewProps) => {
       {/* Skill Tree Roadmap */}
       <div className="relative">
         {/* Connecting line */}
-        <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-primary via-secondary to-primary/30" />
+        <div className="absolute left-7 top-8 bottom-8 w-1 rounded-full bg-gradient-to-b from-primary via-secondary to-primary/30" />
         
         <div className="space-y-6">
           {roadmap.map((node, index) => (
             <motion.div
               key={node.id}
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.15 }}
-              className="relative pl-16"
+              transition={{ delay: index * 0.15, type: "spring", stiffness: 200 }}
+              className="relative pl-20"
             >
               {/* Node marker */}
-              <div className={`absolute left-0 w-12 h-12 rounded-xl flex items-center justify-center z-10 ${
-                index === 0 ? "bg-primary text-primary-foreground glow-emerald" : "glass-card text-primary"
-              }`}>
+              <motion.div 
+                className={`absolute left-0 w-14 h-14 rounded-2xl flex items-center justify-center z-10 ${
+                  index === 0 
+                    ? "bg-gradient-to-br from-primary to-primary/80 text-white shadow-lg shadow-primary/30" 
+                    : "bg-card border-2 border-border text-primary"
+                }`}
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
                 {node.icon}
-              </div>
+                {index === 0 && (
+                  <motion.div
+                    className="absolute -inset-1 rounded-2xl border-2 border-primary/30"
+                    animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                )}
+              </motion.div>
               
               {/* Node content */}
-              <div className="glass-card p-5 border-glow">
+              <motion.div 
+                className="card-elevated p-5"
+                whileHover={{ scale: 1.01 }}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <span className="text-xs font-mono text-secondary uppercase">{node.phase}</span>
+                    <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+                      {node.phase}
+                    </span>
                     <h3 className="text-lg font-bold text-foreground">{node.title}</h3>
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
+                  <span className="text-xs font-semibold text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
                     {node.duration}
                   </span>
                 </div>
@@ -249,22 +276,27 @@ const RoadmapView = ({ answers, onReset }: RoadmapViewProps) => {
                 {/* Skills */}
                 <div className="flex flex-wrap gap-2 mb-4">
                   {node.skills.map((skill) => (
-                    <span
+                    <motion.span
                       key={skill}
-                      className="text-xs px-2 py-1 rounded bg-muted/50 text-muted-foreground"
+                      whileHover={{ scale: 1.05 }}
+                      className="text-xs px-3 py-1.5 rounded-full bg-accent text-accent-foreground font-medium cursor-default"
                     >
                       {skill}
-                    </span>
+                    </motion.span>
                   ))}
                 </div>
                 
                 {/* Milestone */}
-                <div className="flex items-center gap-2 text-sm">
-                  <Zap className="w-4 h-4 text-primary" />
-                  <span className="text-foreground font-medium">Milestone:</span>
-                  <span className="text-muted-foreground">{node.milestone}</span>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-primary/5 to-secondary/5 border border-primary/10">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground font-medium">Milestone</span>
+                    <p className="text-sm text-foreground font-medium">{node.milestone}</p>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           ))}
         </div>
@@ -275,11 +307,12 @@ const RoadmapView = ({ answers, onReset }: RoadmapViewProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="glass-card p-6"
+        className="card-elevated p-6"
       >
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-secondary" />
           <span className="text-gradient-indigo">Curated Resources</span>
+          <Sparkles className="w-4 h-4 text-primary" />
         </h3>
         
         <div className="space-y-3">
@@ -292,14 +325,16 @@ const RoadmapView = ({ answers, onReset }: RoadmapViewProps) => {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.7 + index * 0.1 }}
-              className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group"
+              whileHover={{ x: 6, scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-primary/30 transition-all group"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-all">
                   {getResourceIcon(resource.type)}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                  <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                     {resource.title}
                   </p>
                   <p className="text-xs text-muted-foreground">{resource.platform}</p>
@@ -316,14 +351,17 @@ const RoadmapView = ({ answers, onReset }: RoadmapViewProps) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1 }}
-        className="text-center"
+        className="text-center pt-4"
       >
-        <button
+        <motion.button
           onClick={onReset}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-full hover:bg-muted"
         >
-          ← Retake Diagnostic
-        </button>
+          <ArrowLeft className="w-4 h-4" />
+          Retake Diagnostic
+        </motion.button>
       </motion.div>
     </div>
   );
