@@ -66,8 +66,11 @@ const Auth = () => {
   };
 
   const handleGitHubAuth = async () => {
-    console.log("[Auth] Initiating GitHub OAuth");
-    toast.info("GitHub OAuth coming soon - essential for repo evaluation!");
+    console.log("[Auth] GitHub OAuth not available in Lovable Cloud");
+    toast.error("GitHub OAuth is not yet available. Please use Google or Email login.", {
+      description: "You can still submit GitHub URLs for project evaluation after signing in.",
+      duration: 5000,
+    });
   };
 
   return (
