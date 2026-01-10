@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Target,
@@ -23,14 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-// ============================================================================
-// HACKWELL SENIOR DEBUG SYSTEM - Self-healing state machine
-// Built by ex-Google Principal Engineers
-// ============================================================================
-
-const DEBUG_MODE = true; // Enable detailed logging
-const SELF_HEAL_ENABLED = true; // Auto-fix invalid states
+import { Progress } from "@/components/ui/progress";
 
 // State machine for the weekly mission flow
 type MissionPhase = 
@@ -39,15 +32,6 @@ type MissionPhase =
   | "evaluating" // AI is reviewing
   | "results"    // Show pass/fail results
   | "unlocked";  // Week completed, ready for next
-
-// Valid phase transitions (state machine guard)
-const VALID_TRANSITIONS: Record<MissionPhase, MissionPhase[]> = {
-  tasks: ["submit"],
-  submit: ["tasks", "evaluating"],
-  evaluating: ["results"],
-  results: ["submit", "unlocked"], // Can retry (submit) or proceed (unlocked)
-  unlocked: ["tasks"], // Reset for new week
-};
 
 interface Task {
   id: string;
@@ -82,23 +66,6 @@ interface WeeklyMissionCardProps {
   onNextWeek: () => void;
   isDemo?: boolean;
 }
-
-// Debug logger with timestamp
-const debugLog = (component: string, action: string, data?: unknown) => {
-  if (!DEBUG_MODE) return;
-  const timestamp = new Date().toISOString().slice(11, 23);
-  console.log(`%c[${timestamp}] [${component}] ${action}`, 'color: #10B981; font-weight: bold;', data || '');
-};
-
-// Debug error with stack trace
-const debugError = (component: string, error: string, data?: unknown) => {
-  console.error(`%c[HACKWELL ERROR] [${component}] ${error}`, 'color: #EF4444; font-weight: bold;', data || '');
-};
-
-// Debug warn for self-healing actions
-const debugWarn = (component: string, message: string, data?: unknown) => {
-  console.warn(`%c[HACKWELL SELF-HEAL] [${component}] ${message}`, 'color: #F59E0B; font-weight: bold;', data || '');
-};
 
 // Helper function for quality labels
 const getQualityLabel = (score: number) => {
@@ -152,11 +119,6 @@ export const WeeklyMissionCard = ({
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [scanStep, setScanStep] = useState(0);
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
-  
-  // Refs for self-healing
-  const lastWeekRef = useRef(weekNumber);
-  const phaseHistoryRef = useRef<MissionPhase[]>(["tasks"]);
-  const evalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const completedCount = tasks.filter((t) => t.isCompleted).length;
   const allTasksCompleted = tasks.length > 0 && completedCount === tasks.length;
@@ -171,165 +133,33 @@ export const WeeklyMissionCard = ({
     { label: "Generating professional feedback...", icon: FileText },
   ];
 
-  // ============================================================================
-  // SELF-HEALING STATE MACHINE
-  // ============================================================================
-
-  // Safe phase transition with validation
-  const safeSetPhase = useCallback((nextPhase: MissionPhase, reason: string) => {
-    setPhase(currentPhase => {
-      // Validate transition
-      const allowedTransitions = VALID_TRANSITIONS[currentPhase];
-      
-      if (!allowedTransitions.includes(nextPhase)) {
-        // Self-heal: Log warning and determine correct action
-        if (SELF_HEAL_ENABLED) {
-          debugWarn('StateMachine', `Invalid transition: ${currentPhase} → ${nextPhase}. Reason: ${reason}`);
-          
-          // Self-healing logic based on context
-          if (nextPhase === "tasks" && currentPhase !== "unlocked") {
-            // Always allow going back to tasks (safe reset)
-            debugWarn('StateMachine', 'Self-healing: Allowing reset to tasks');
-            phaseHistoryRef.current.push("tasks");
-            return "tasks";
-          }
-          
-          // Stay in current phase for invalid transitions
-          debugWarn('StateMachine', `Self-healing: Staying in ${currentPhase}`);
-          return currentPhase;
-        }
-        
-        debugError('StateMachine', `Blocked invalid transition: ${currentPhase} → ${nextPhase}`);
-        return currentPhase;
-      }
-
-      debugLog('StateMachine', `Transition: ${currentPhase} → ${nextPhase}`, { reason });
-      phaseHistoryRef.current.push(nextPhase);
-      return nextPhase;
-    });
-  }, []);
-
-  // ============================================================================
-  // WEEK CHANGE DETECTION (Critical for proper reset)
-  // ============================================================================
-  
+  // Reset to tasks phase when weekNumber changes (new week unlocked)
   useEffect(() => {
-    if (weekNumber !== lastWeekRef.current) {
-      debugLog('WeekChange', `Week changed: ${lastWeekRef.current} → ${weekNumber}`, {
-        previousPhase: phase,
-        resettingTo: 'tasks'
-      });
-      
-      // Clear any pending evaluation timeouts
-      if (evalTimeoutRef.current) {
-        clearTimeout(evalTimeoutRef.current);
-        evalTimeoutRef.current = null;
-        debugWarn('Cleanup', 'Cleared pending evaluation timeout');
-      }
-      
-      // Full reset for new week
-      setPhase("tasks");
-      setGithubUrl("");
-      setResult(null);
-      setScanStep(0);
-      phaseHistoryRef.current = ["tasks"];
-      
-      lastWeekRef.current = weekNumber;
-    }
-  }, [weekNumber, phase]);
-
-  // ============================================================================
-  // SELF-HEALING: Stuck state detection
-  // ============================================================================
-  
-  useEffect(() => {
-    // Detect stuck in evaluating phase (timeout after 60 seconds)
-    if (phase === "evaluating") {
-      evalTimeoutRef.current = setTimeout(() => {
-        debugWarn('SelfHeal', 'Evaluation stuck for 60s, auto-recovering...');
-        setResult({
-          passed: false,
-          score: 0,
-          feedback: "Evaluation timed out. Please try again.",
-        });
-        setPhase("results");
-      }, 60000);
-
-      return () => {
-        if (evalTimeoutRef.current) {
-          clearTimeout(evalTimeoutRef.current);
-        }
-      };
-    }
-  }, [phase]);
-
-  // ============================================================================
-  // SELF-HEALING: Invalid state detection on mount/update
-  // ============================================================================
-  
-  useEffect(() => {
-    // Detect invalid states and self-heal
-    if (SELF_HEAL_ENABLED) {
-      // Case 1: In "results" but no result data
-      if (phase === "results" && !result) {
-        debugWarn('SelfHeal', 'In results phase but no result data, resetting to tasks');
-        setPhase("tasks");
-        return;
-      }
-      
-      // Case 2: In "unlocked" but somehow still showing (should trigger onNextWeek)
-      if (phase === "unlocked") {
-        debugLog('SelfHeal', 'In unlocked phase, ready for next week transition');
-      }
-      
-      // Case 3: Tasks not loaded but not in tasks phase
-      if (tasks.length === 0 && phase !== "tasks") {
-        debugWarn('SelfHeal', 'No tasks loaded, resetting to tasks phase');
-        setPhase("tasks");
-        return;
-      }
-    }
-  }, [phase, result, tasks.length]);
+    console.log(`[WeeklyMissionCard] Week changed to: ${weekNumber}, resetting to tasks phase`);
+    setPhase("tasks");
+    setGithubUrl("");
+    setResult(null);
+    setScanStep(0);
+  }, [weekNumber]);
 
   // Log phase transitions for debugging
   useEffect(() => {
-    debugLog('PhaseUpdate', `Current phase: ${phase}`, {
-      weekNumber,
-      tasksCompleted: `${completedCount}/${tasks.length}`,
-      hasResult: !!result,
-      phaseHistory: phaseHistoryRef.current
-    });
-  }, [phase, weekNumber, completedCount, tasks.length, result]);
+    console.log(`[WeeklyMissionCard] Phase changed to: ${phase}`);
+  }, [phase]);
 
-  // ============================================================================
-  // ACTION HANDLERS (with validation)
-  // ============================================================================
+  const handleProceedToSubmit = () => {
+    console.log("[WeeklyMissionCard] Proceeding to submit phase");
+    setPhase("submit");
+  };
 
-  const handleProceedToSubmit = useCallback(() => {
-    if (!allTasksCompleted) {
-      debugWarn('Validation', 'Attempted to proceed without completing all tasks', {
-        completed: completedCount,
-        total: tasks.length
-      });
+  const handleSubmitRepo = async () => {
+    if (!githubUrl.includes("github.com")) {
+      console.warn("[WeeklyMissionCard] Invalid GitHub URL");
       return;
     }
     
-    debugLog('Action', 'Proceeding to submit phase');
-    safeSetPhase("submit", "User completed all tasks");
-  }, [allTasksCompleted, completedCount, tasks.length, safeSetPhase]);
-
-  const handleSubmitRepo = useCallback(async () => {
-    // Validate GitHub URL
-    const isValidUrl = githubUrl.includes("github.com") && 
-                       (githubUrl.includes("github.com/") && githubUrl.split("/").length >= 5);
-    
-    if (!isValidUrl) {
-      debugWarn('Validation', 'Invalid GitHub URL format', { url: githubUrl });
-      return;
-    }
-    
-    debugLog('Action', 'Starting evaluation', { url: githubUrl });
-    safeSetPhase("evaluating", "User submitted repo for evaluation");
+    console.log("[WeeklyMissionCard] Starting evaluation for:", githubUrl);
+    setPhase("evaluating");
     setScanStep(0);
 
     // Animate through scan steps
@@ -346,73 +176,33 @@ export const WeeklyMissionCard = ({
     try {
       const evalResult = await onSubmitRepo(githubUrl);
       clearInterval(stepInterval);
-      
-      // Validate result
-      if (!evalResult || typeof evalResult.score !== 'number') {
-        debugError('Evaluation', 'Invalid result format', evalResult);
-        throw new Error('Invalid evaluation result');
-      }
-      
-      debugLog('Action', 'Evaluation complete', { 
-        score: evalResult.score, 
-        passed: evalResult.passed 
-      });
-      
+      console.log("[WeeklyMissionCard] Evaluation complete:", evalResult);
       setResult(evalResult);
-      setPhase("results"); // Direct set since we're transitioning from evaluating
-      
+      setPhase("results");
     } catch (error) {
       clearInterval(stepInterval);
-      debugError('Evaluation', 'Evaluation failed', error);
-      
+      console.error("[WeeklyMissionCard] Evaluation failed:", error);
       setResult({
         passed: false,
         score: 0,
-        feedback: error instanceof Error 
-          ? `Evaluation failed: ${error.message}` 
-          : "Failed to evaluate. Please try again.",
+        feedback: "Failed to evaluate. Please try again.",
       });
       setPhase("results");
     }
-  }, [githubUrl, onSubmitRepo, scanSteps.length, safeSetPhase]);
+  };
 
-  const handleTryAgain = useCallback(() => {
-    debugLog('Action', 'User retrying submission');
+  const handleTryAgain = () => {
+    console.log("[WeeklyMissionCard] Retrying submission");
     setGithubUrl("");
     setResult(null);
-    setScanStep(0);
-    safeSetPhase("submit", "User clicked try again");
-  }, [safeSetPhase]);
+    setPhase("submit");
+  };
 
-  const handleBackToTasks = useCallback(() => {
-    debugLog('Action', 'User going back to tasks');
-    setGithubUrl("");
-    setResult(null);
-    setPhase("tasks"); // Always allow going back to tasks
-  }, []);
-
-  const handleUnlockNext = useCallback(() => {
-    if (!result?.passed) {
-      debugWarn('Validation', 'Attempted to unlock next week without passing');
-      return;
-    }
-    
-    debugLog('Action', 'Unlocking next week', { 
-      currentWeek: weekNumber,
-      nextWeek: weekNumber + 1 
-    });
-    
+  const handleUnlockNext = () => {
+    console.log("[WeeklyMissionCard] Unlocking next week");
     setPhase("unlocked");
-    
-    // Small delay to show celebration before transitioning
-    setTimeout(() => {
-      onNextWeek();
-    }, 100);
-  }, [result?.passed, weekNumber, onNextWeek]);
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
+    onNextWeek();
+  };
 
   return (
     <motion.div
@@ -438,27 +228,23 @@ export const WeeklyMissionCard = ({
           
           {/* Phase Indicator */}
           <div className="flex items-center gap-2">
-            {(["tasks", "submit", "evaluating", "results"] as const).map((p, i) => {
-              const phaseOrder = ["tasks", "submit", "evaluating", "results"] as const;
-              const currentPhaseIndex = phaseOrder.indexOf(phase as typeof phaseOrder[number]);
-              return (
-                <motion.div
-                  key={p}
-                  initial={{ scale: 0.8 }}
-                  animate={{ 
-                    scale: phase === p ? 1.1 : 1,
-                    opacity: phase === p ? 1 : 0.5 
-                  }}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    phase === p
-                      ? "w-6 bg-primary shadow-md shadow-primary/50"
-                      : i < currentPhaseIndex
-                      ? "w-2 bg-primary/60"
-                      : "w-2 bg-muted-foreground/30"
-                  }`}
-                />
-              );
-            })}
+            {["tasks", "submit", "evaluating", "results"].map((p, i) => (
+              <motion.div
+                key={p}
+                initial={{ scale: 0.8 }}
+                animate={{ 
+                  scale: phase === p ? 1.1 : 1,
+                  opacity: phase === p ? 1 : 0.5 
+                }}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  phase === p
+                    ? "w-6 bg-primary shadow-md shadow-primary/50"
+                    : i < ["tasks", "submit", "evaluating", "results"].indexOf(phase)
+                    ? "w-2 bg-primary/60"
+                    : "w-2 bg-muted-foreground/30"
+                }`}
+              />
+            ))}
           </div>
         </div>
 
@@ -591,7 +377,7 @@ export const WeeklyMissionCard = ({
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={handleBackToTasks}
+                  onClick={() => setPhase("tasks")}
                   className="flex-1 h-12 border-border/50 hover:bg-muted/50"
                 >
                   Back to Tasks
@@ -799,7 +585,7 @@ export const WeeklyMissionCard = ({
           </motion.div>
         )}
 
-        {/* PHASE 5: Unlocked - Brief celebration before transition */}
+        {/* PHASE 5: Unlocked */}
         {phase === "unlocked" && (
           <motion.div
             key="unlocked"
@@ -816,17 +602,15 @@ export const WeeklyMissionCard = ({
               <Trophy className="w-10 h-10 text-primary-foreground" />
             </motion.div>
             <h4 className="text-2xl font-bold text-primary mb-2">Week {weekNumber} Complete!</h4>
-            <p className="text-muted-foreground">
-              +10 credits earned. Loading Week {weekNumber + 1}...
+            <p className="text-muted-foreground mb-6">
+              +10 credits earned. Week {weekNumber + 1} is now unlocked.
             </p>
-            <motion.div 
-              className="mt-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:shadow-lg hover:shadow-primary/30"
             >
-              <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
-            </motion.div>
+              Continue to Week {weekNumber + 1}
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
