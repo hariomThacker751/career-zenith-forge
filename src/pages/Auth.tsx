@@ -53,15 +53,41 @@ const Auth = () => {
 
   const handleGoogleAuth = async () => {
     console.log("[Auth] Initiating Google OAuth");
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-    if (error) {
-      console.error("[Auth] Google OAuth error:", error.message);
-      toast.error(error.message);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          // In embedded preview (iframe), Google can block the OAuth flow.
+          // We grab the URL and open it in a top-level browsing context.
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) throw error;
+
+      const url = data?.url;
+      if (!url) throw new Error("Unable to start Google sign-in.");
+
+      const isInIframe = (() => {
+        try {
+          return window.self !== window.top;
+        } catch {
+          return true;
+        }
+      })();
+
+      if (isInIframe) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        toast.info("Google sign-in opened in a new tab—finish there and return.");
+      } else {
+        window.location.assign(url);
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? "Google sign-in failed";
+      console.error("[Auth] Google OAuth error:", msg);
+      toast.error(msg);
     }
   };
 
