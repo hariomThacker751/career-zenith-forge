@@ -18,12 +18,29 @@ export interface ProjectPRD {
   difficulty: string;
 }
 
-export interface SprintEvent {
-  day: number;
+export interface KnowledgeSource {
   title: string;
+  source: string;
+  url: string;
+  type: "course" | "documentation" | "tutorial" | "repository";
+}
+
+export interface ForgeObjective {
+  milestone: string;
+  deliverables: string[];
+}
+
+export interface CalendarEvent {
+  summary: string;
   description: string;
-  duration: string;
-  type: "design" | "coding" | "testing" | "review";
+}
+
+export interface WeeklySprint {
+  week: number;
+  theme: string;
+  knowledgeStack: KnowledgeSource[];
+  forgeObjective: ForgeObjective;
+  calendarEvent: CalendarEvent;
 }
 
 export interface AgentInsights {
@@ -47,7 +64,8 @@ export interface PhaseData {
   };
   phase3: {
     completed: boolean;
-    schedule: SprintEvent[];
+    sprints: WeeklySprint[];
+    totalWeeks: number;
     submissionUrl: string | null;
     submitted: boolean;
   };
@@ -79,7 +97,8 @@ const initialPhaseData: PhaseData = {
   },
   phase3: {
     completed: false,
-    schedule: [],
+    sprints: [],
+    totalWeeks: 24,
     submissionUrl: null,
     submitted: false,
   },
