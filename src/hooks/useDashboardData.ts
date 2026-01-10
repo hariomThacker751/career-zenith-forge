@@ -69,7 +69,8 @@ export function useDashboardData(userId?: string) {
       }
 
       // Fetch current sprint based on week
-      const { data: sprintData, error: sprintError } = await supabase
+      let sprintData: WeeklySprint | null = null;
+      const { data: existingSprint, error: sprintError } = await supabase
         .from("weekly_sprints")
         .select("*")
         .eq("user_id", userId)
@@ -77,6 +78,73 @@ export function useDashboardData(userId?: string) {
         .maybeSingle();
 
       if (sprintError) throw sprintError;
+
+      // If no sprint exists for current week, create one with initial tasks
+      if (!existingSprint) {
+        const weekThemes = [
+          "Backend Development Fundamentals",
+          "REST API Design & Implementation",
+          "Database Design & SQL Mastery",
+          "Authentication & Security",
+          "Testing & Quality Assurance",
+          "DevOps & CI/CD Pipelines",
+          "Frontend Architecture",
+          "State Management Patterns",
+          "Performance Optimization",
+          "Building Portfolio Projects",
+          "Open Source Contributions",
+          "Technical Interview Prep",
+        ];
+
+        const themeIndex = (progress.current_week - 1) % weekThemes.length;
+        const theme = weekThemes[themeIndex];
+
+        const { data: newSprint, error: createSprintError } = await supabase
+          .from("weekly_sprints")
+          .insert({
+            user_id: userId,
+            week_number: progress.current_week,
+            phase: progress.current_phase,
+            theme,
+            status: "active",
+          })
+          .select()
+          .single();
+
+        if (createSprintError) throw createSprintError;
+        sprintData = newSprint;
+
+        // Create initial tasks for this sprint
+        const initialTasks = [
+          { title: "Complete the core learning module", description: `Master the fundamentals of ${theme}`, sort_order: 0 },
+          { title: "Build a practice project", description: "Apply what you learned in a hands-on project", sort_order: 1 },
+          { title: "Write documentation for your code", description: "Document your implementation and learnings", sort_order: 2 },
+          { title: "Review and refactor your code", description: "Improve code quality and best practices", sort_order: 3 },
+          { title: "Submit for AI evaluation", description: "Push to GitHub and submit for review", sort_order: 4 },
+        ];
+
+        const { error: tasksError } = await supabase
+          .from("weekly_tasks")
+          .insert(
+            initialTasks.map(task => ({
+              sprint_id: newSprint.id,
+              title: task.title,
+              description: task.description,
+              sort_order: task.sort_order,
+            }))
+          );
+
+        if (tasksError) throw tasksError;
+
+        // Log welcome activity
+        await supabase.from("activity_log").insert({
+          user_id: userId,
+          agent_type: "system",
+          message: `Welcome to Hackwell! Week ${progress.current_week} - ${theme} is now active.`,
+        });
+      } else {
+        sprintData = existingSprint;
+      }
 
       // Fetch tasks for current sprint
       let tasks: WeeklyTask[] = [];
