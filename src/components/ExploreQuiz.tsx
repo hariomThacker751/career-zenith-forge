@@ -1,101 +1,92 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Gamepad2, 
-  Palette, 
-  Brain, 
-  PenTool, 
-  Globe, 
-  Banknote,
-  Server,
-  Code,
-  Calculator,
+  GraduationCap, 
+  Gauge, 
+  Zap, 
+  Clock, 
+  Lightbulb,
   Sparkles,
-  GraduationCap,
   ChevronRight,
   ChevronLeft,
-  Zap
+  Brain
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 
 interface ExploreQuestion {
   id: string;
   category: string;
   question: string;
   icon: React.ReactNode;
-  options: {
+  options?: {
     label: string;
     value: string;
-    icon: React.ReactNode;
   }[];
-  multiSelect?: boolean;
+  isOpenEnded?: boolean;
+  placeholder?: string;
 }
 
+// Hard-locked 5 questions - ONLY for Explore Mode
 const exploreQuestions: ExploreQuestion[] = [
   {
-    id: "hobbies",
-    category: "Your Hobbies",
-    question: "What do you enjoy doing in your free time?",
-    icon: <Gamepad2 className="w-6 h-6" />,
-    multiSelect: true,
-    options: [
-      { label: "Gaming", value: "gaming", icon: <Gamepad2 className="w-5 h-5" /> },
-      { label: "Art & Design", value: "art", icon: <Palette className="w-5 h-5" /> },
-      { label: "Problem-solving & Puzzles", value: "problem-solving", icon: <Brain className="w-5 h-5" /> },
-      { label: "Writing & Storytelling", value: "writing", icon: <PenTool className="w-5 h-5" /> },
-    ]
-  },
-  {
-    id: "interests",
-    category: "Core Interests",
-    question: "What area excites you the most?",
-    icon: <Globe className="w-6 h-6" />,
-    multiSelect: true,
-    options: [
-      { label: "Social Impact", value: "social-impact", icon: <Globe className="w-5 h-5" /> },
-      { label: "FinTech & Finance", value: "fintech", icon: <Banknote className="w-5 h-5" /> },
-      { label: "High-Performance Systems", value: "systems", icon: <Server className="w-5 h-5" /> },
-      { label: "AI & Automation", value: "ai", icon: <Brain className="w-5 h-5" /> },
-    ]
-  },
-  {
-    id: "skills",
-    category: "Basic Skills",
-    question: "What skills do you already have?",
-    icon: <Code className="w-6 h-6" />,
-    multiSelect: true,
-    options: [
-      { label: "Coding Languages", value: "coding", icon: <Code className="w-5 h-5" /> },
-      { label: "Excel & Data", value: "excel", icon: <Calculator className="w-5 h-5" /> },
-      { label: "Design & UI/UX", value: "design", icon: <Palette className="w-5 h-5" /> },
-      { label: "Math & Logic", value: "math", icon: <Brain className="w-5 h-5" /> },
-    ]
-  },
-  {
-    id: "branch",
-    category: "Branch / Major",
-    question: "What's your field of study?",
+    id: "academic_position",
+    category: "Academic Position",
+    question: "Where are you in your journey right now?",
     icon: <GraduationCap className="w-6 h-6" />,
-    multiSelect: false,
     options: [
-      { label: "Computer Science / IT", value: "cs", icon: <Code className="w-5 h-5" /> },
-      { label: "Engineering (Non-CS)", value: "engineering", icon: <Server className="w-5 h-5" /> },
-      { label: "Business / Commerce", value: "business", icon: <Banknote className="w-5 h-5" /> },
-      { label: "Arts / Humanities", value: "arts", icon: <Palette className="w-5 h-5" /> },
+      { label: "1st Year Student", value: "1st_year" },
+      { label: "2nd Year Student", value: "2nd_year" },
+      { label: "3rd Year Student", value: "3rd_year" },
+      { label: "4th Year / Final Year", value: "4th_year" },
+      { label: "Recent Graduate", value: "graduate" },
+      { label: "Working Professional", value: "professional" },
     ]
   },
   {
-    id: "year",
-    category: "Current Year",
-    question: "What year are you in?",
-    icon: <GraduationCap className="w-6 h-6" />,
-    multiSelect: false,
+    id: "skill_level",
+    category: "Self-Assessment",
+    question: "How would you rate your current technical skill level?",
+    icon: <Gauge className="w-6 h-6" />,
     options: [
-      { label: "1st Year", value: "1st", icon: <Sparkles className="w-5 h-5" /> },
-      { label: "2nd Year", value: "2nd", icon: <Sparkles className="w-5 h-5" /> },
-      { label: "3rd Year", value: "3rd", icon: <Sparkles className="w-5 h-5" /> },
-      { label: "4th Year / Final", value: "4th", icon: <GraduationCap className="w-5 h-5" /> },
+      { label: "Beginner — Just starting out, learning basics", value: "beginner" },
+      { label: "Intermediate — Built some projects, comfortable coding", value: "intermediate" },
+      { label: "Advanced — Deep expertise, production experience", value: "advanced" },
     ]
+  },
+  {
+    id: "work_energy",
+    category: "Work Style",
+    question: "What type of work energizes you the most?",
+    icon: <Zap className="w-6 h-6" />,
+    options: [
+      { label: "Logic & Problem-Solving", value: "logic" },
+      { label: "Visuals & Design", value: "visuals" },
+      { label: "Building Systems & Infrastructure", value: "systems" },
+      { label: "Automation & Efficiency", value: "automation" },
+      { label: "Working with People & Communication", value: "people" },
+      { label: "Creative Expression & Innovation", value: "creativity" },
+    ]
+  },
+  {
+    id: "constraints",
+    category: "Real Constraints",
+    question: "What real constraints are you facing right now?",
+    icon: <Clock className="w-6 h-6" />,
+    options: [
+      { label: "Limited time (< 10 hrs/week available)", value: "limited_time" },
+      { label: "Urgency — Need results in 3-6 months", value: "urgency" },
+      { label: "Financial pressure — Need income soon", value: "financial" },
+      { label: "No major constraints — Flexible timeline", value: "flexible" },
+    ]
+  },
+  {
+    id: "build_idea",
+    category: "Your Vision",
+    question: "If you had to build one thing to improve your daily life, what would it be?",
+    icon: <Lightbulb className="w-6 h-6" />,
+    isOpenEnded: true,
+    placeholder: "Describe something you'd love to build... (e.g., an app that tracks my habits, a tool that automates my email responses, a game that helps me learn...)"
   }
 ];
 
@@ -107,6 +98,7 @@ interface ExploreQuizProps {
 const ExploreQuiz = ({ onComplete, onBack }: ExploreQuizProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [openEndedText, setOpenEndedText] = useState("");
   const [displayedText, setDisplayedText] = useState("");
   
   const currentQuestion = exploreQuestions[currentStep];
@@ -124,34 +116,39 @@ const ExploreQuiz = ({ onComplete, onBack }: ExploreQuizProps) => {
       } else {
         clearInterval(interval);
       }
-    }, 30);
+    }, 25);
     return () => clearInterval(interval);
   }, [currentStep, currentQuestion.question]);
 
-  const toggleOption = (value: string) => {
-    const current = answers[currentQuestion.id] || [];
-    if (currentQuestion.multiSelect) {
-      if (current.includes(value)) {
-        setAnswers({ ...answers, [currentQuestion.id]: current.filter(v => v !== value) });
-      } else {
-        setAnswers({ ...answers, [currentQuestion.id]: [...current, value] });
-      }
-    } else {
-      setAnswers({ ...answers, [currentQuestion.id]: [value] });
-    }
+  const selectOption = (value: string) => {
+    setAnswers({ ...answers, [currentQuestion.id]: [value] });
   };
 
   const isSelected = (value: string) => {
     return (answers[currentQuestion.id] || []).includes(value);
   };
 
-  const canProceed = (answers[currentQuestion.id] || []).length > 0;
+  const canProceed = () => {
+    if (currentQuestion.isOpenEnded) {
+      return openEndedText.trim().length >= 10;
+    }
+    return (answers[currentQuestion.id] || []).length > 0;
+  };
 
   const handleNext = () => {
+    // Save open-ended answer before proceeding
+    if (currentQuestion.isOpenEnded && openEndedText.trim()) {
+      setAnswers(prev => ({ ...prev, [currentQuestion.id]: [openEndedText.trim()] }));
+    }
+
     if (currentStep < exploreQuestions.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
-      onComplete(answers);
+      // Include the open-ended answer in final submission
+      const finalAnswers = currentQuestion.isOpenEnded 
+        ? { ...answers, [currentQuestion.id]: [openEndedText.trim()] }
+        : answers;
+      onComplete(finalAnswers);
     }
   };
 
@@ -172,14 +169,14 @@ const ExploreQuiz = ({ onComplete, onBack }: ExploreQuizProps) => {
         className="text-center mb-8"
       >
         <div className="pill-badge mb-4 mx-auto w-fit">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span>Explore Mode • Discovery Quiz</span>
+          <Brain className="w-4 h-4 text-primary" />
+          <span>Explore Mode • Career Discovery</span>
         </div>
         <h2 className="text-2xl md:text-3xl font-bold mb-2">
-          <span className="text-gradient-sunset">Let's Find Your Path</span>
+          <span className="text-gradient-sunset">Building Your Career Profile</span>
         </h2>
         <p className="text-muted-foreground text-sm">
-          {currentQuestion.multiSelect ? "Select all that apply" : "Choose one option"}
+          5 essential questions to predict your perfect career path
         </p>
       </motion.div>
 
@@ -203,7 +200,7 @@ const ExploreQuiz = ({ onComplete, onBack }: ExploreQuizProps) => {
         </div>
       </div>
 
-      {/* Question Card - Floating Card Style */}
+      {/* Question Card */}
       <AnimatePresence mode="popLayout">
         <motion.div
           key={currentStep}
@@ -236,49 +233,65 @@ const ExploreQuiz = ({ onComplete, onBack }: ExploreQuizProps) => {
             />
           </h3>
 
-          {/* Options grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {currentQuestion.options.map((option, index) => (
-              <motion.button
-                key={option.value}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + index * 0.1 }}
-                onClick={() => toggleOption(option.value)}
-                className={`relative p-4 rounded-xl border-2 transition-all duration-300 text-left group ${
-                  isSelected(option.value)
-                    ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
-                    : "border-border/50 hover:border-primary/50 bg-card/50 hover:bg-card"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg transition-colors ${
-                    isSelected(option.value) 
-                      ? "bg-primary text-white" 
-                      : "bg-muted text-muted-foreground group-hover:text-primary"
-                  }`}>
-                    {option.icon}
+          {/* Options or Open-ended input */}
+          {currentQuestion.isOpenEnded ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Textarea
+                value={openEndedText}
+                onChange={(e) => setOpenEndedText(e.target.value)}
+                placeholder={currentQuestion.placeholder}
+                className="min-h-[150px] text-base bg-card/50 border-border/50 focus:border-primary/50 resize-none"
+              />
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                {openEndedText.length < 10 
+                  ? `Minimum 10 characters (${10 - openEndedText.length} more needed)`
+                  : "✓ Great! Your response will help us find the perfect career match"
+                }
+              </p>
+            </motion.div>
+          ) : (
+            <div className="grid gap-3">
+              {currentQuestion.options?.map((option, index) => (
+                <motion.button
+                  key={option.value}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 + index * 0.08 }}
+                  onClick={() => selectOption(option.value)}
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-300 text-left group ${
+                    isSelected(option.value)
+                      ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
+                      : "border-border/50 hover:border-primary/50 bg-card/50 hover:bg-card"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      isSelected(option.value) 
+                        ? "border-primary bg-primary" 
+                        : "border-muted-foreground/50"
+                    }`}>
+                      {isSelected(option.value) && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="w-2 h-2 bg-white rounded-full"
+                        />
+                      )}
+                    </div>
+                    <span className={`font-medium ${
+                      isSelected(option.value) ? "text-primary" : "text-foreground"
+                    }`}>
+                      {option.label}
+                    </span>
                   </div>
-                  <span className={`font-medium ${
-                    isSelected(option.value) ? "text-primary" : "text-foreground"
-                  }`}>
-                    {option.label}
-                  </span>
-                </div>
-                
-                {/* Selection indicator */}
-                {isSelected(option.value) && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center"
-                  >
-                    <span className="text-white text-xs">✓</span>
-                  </motion.div>
-                )}
-              </motion.button>
-            ))}
-          </div>
+                </motion.button>
+              ))}
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 
@@ -300,13 +313,13 @@ const ExploreQuiz = ({ onComplete, onBack }: ExploreQuizProps) => {
 
         <Button
           onClick={handleNext}
-          disabled={!canProceed}
+          disabled={!canProceed()}
           className="gap-2 bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/25 px-8"
         >
           {currentStep === exploreQuestions.length - 1 ? (
             <>
-              <Zap className="w-4 h-4" />
-              Analyze My Profile
+              <Sparkles className="w-4 h-4" />
+              Predict My Career
             </>
           ) : (
             <>

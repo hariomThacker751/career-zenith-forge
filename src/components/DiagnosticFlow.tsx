@@ -14,7 +14,8 @@ import {
   Zap,
   AlertTriangle,
   Brain,
-  Compass
+  Compass,
+  Rocket
 } from "lucide-react";
 import DiagnosticCard from "./DiagnosticCard";
 import AgentPanel from "./AgentPanel";
@@ -27,6 +28,7 @@ import Phase3Launch from "./Phase3Launch";
 import InitialDiscovery from "./InitialDiscovery";
 import ExploreQuiz from "./ExploreQuiz";
 import CareerResults from "./CareerResults";
+import ProjectSelection from "./ProjectSelection";
 import LiveReasoningLog, { ReasoningEntry } from "./LiveReasoningLog";
 import GamificationPanel from "./GamificationPanel";
 import { Button } from "./ui/button";
@@ -115,7 +117,7 @@ const questions: Question[] = [
   }
 ];
 
-type FlowState = "discovery" | "explore-quiz" | "career-results" | "resume" | "manual-recon" | "questions" | "analysis" | "phases";
+type FlowState = "discovery" | "explore-quiz" | "career-results" | "project-selection" | "resume" | "manual-recon" | "questions" | "analysis" | "phases";
 type PathType = "targeted" | "explore";
 
 const DiagnosticFlow = () => {
@@ -145,6 +147,7 @@ const DiagnosticFlow = () => {
   // Store explore quiz answers for career analysis
   const [exploreAnswers, setExploreAnswers] = useState<Record<string, string[]>>({});
   const [selectedCareer, setSelectedCareer] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<{ title: string; techStack: string[] } | null>(null);
 
   const handlePathSelect = (path: PathType) => {
     setSelectedPath(path);
@@ -173,15 +176,27 @@ const DiagnosticFlow = () => {
     setSelectedCareer(career.title);
     // Store the target career in the phase context for use in generating personalized content
     setTargetCareer(career.title, exploreAnswers);
-    addReasoningEntry("ORCHESTRATOR", `Career path locked: ${career.title}. Initializing "Close the Gap" pipeline...`, "decision");
-    addReasoningEntry("FORGE", `Preparing skill gap assessment for ${career.title}...`, "analysis");
-    addReasoningEntry("PROFILER", `Target profession identified. Proceeding to gather additional context...`, "analysis");
-    // Go directly to questions to complete the diagnostic, then to analysis and phases
-    setFlowState("questions");
+    addReasoningEntry("ORCHESTRATOR", `Career path locked: ${career.title}. Proceeding to project selection...`, "decision");
+    addReasoningEntry("FORGE", `Curating projects tailored for ${career.title}...`, "analysis");
+    // Go to project selection (Explore Mode specific flow)
+    setFlowState("project-selection");
   };
 
   const handleCareerResultsBack = () => {
     setFlowState("explore-quiz");
+  };
+
+  const handleProjectSelect = (project: { id: string; title: string; techStack: string[]; estimatedWeeks: number }) => {
+    setSelectedProject({ title: project.title, techStack: project.techStack });
+    addReasoningEntry("ORCHESTRATOR", `Project selected: ${project.title}. Generating resources and weekly roadmap...`, "decision");
+    addReasoningEntry("FORGE", `Building ${project.estimatedWeeks}-week execution plan with milestones...`, "action");
+    // Skip Phase 1 (skills), go directly to Phase 2 (resources/project) with the selected project context
+    // Then Phase 3 will have the weekly planning
+    setFlowState("phases");
+  };
+
+  const handleProjectSelectionBack = () => {
+    setFlowState("career-results");
   };
 
   const handleSelect = (answer: string) => {
@@ -327,6 +342,23 @@ const DiagnosticFlow = () => {
               <ExploreQuiz 
                 onComplete={handleExploreQuizComplete} 
                 onBack={handleExploreQuizBack} 
+              />
+            </motion.div>
+          )}
+
+          {flowState === "project-selection" && (
+            <motion.div
+              key="project-selection"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <ProjectSelection 
+                targetCareer={selectedCareer || ""}
+                exploreAnswers={exploreAnswers}
+                onSelectProject={handleProjectSelect}
+                onBack={handleProjectSelectionBack}
               />
             </motion.div>
           )}
