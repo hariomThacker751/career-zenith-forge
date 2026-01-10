@@ -14,7 +14,202 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_log: {
+        Row: {
+          agent_type: string
+          created_at: string
+          id: string
+          message: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          agent_type: string
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          agent_type?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_submissions: {
+        Row: {
+          ai_feedback: string | null
+          created_at: string
+          evaluated_at: string | null
+          github_url: string
+          hackwell_score: number | null
+          id: string
+          sprint_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          ai_feedback?: string | null
+          created_at?: string
+          evaluated_at?: string | null
+          github_url: string
+          hackwell_score?: number | null
+          id?: string
+          sprint_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          ai_feedback?: string | null
+          created_at?: string
+          evaluated_at?: string | null
+          github_url?: string
+          hackwell_score?: number | null
+          id?: string
+          sprint_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_submissions_sprint_id_fkey"
+            columns: ["sprint_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_sprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_progress: {
+        Row: {
+          created_at: string
+          credits: number
+          current_phase: number
+          current_week: number
+          id: string
+          roadmap_generated_at: string | null
+          target_career: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          current_phase?: number
+          current_week?: number
+          id?: string
+          roadmap_generated_at?: string | null
+          target_career?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          current_phase?: number
+          current_week?: number
+          id?: string
+          roadmap_generated_at?: string | null
+          target_career?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_sprints: {
+        Row: {
+          calendar_synced: boolean | null
+          completed_at: string | null
+          created_at: string
+          feedback_log: string | null
+          forge_objective: Json | null
+          id: string
+          knowledge_stack: Json | null
+          phase: number
+          status: string
+          theme: string
+          updated_at: string
+          user_id: string
+          week_number: number
+        }
+        Insert: {
+          calendar_synced?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          feedback_log?: string | null
+          forge_objective?: Json | null
+          id?: string
+          knowledge_stack?: Json | null
+          phase: number
+          status?: string
+          theme: string
+          updated_at?: string
+          user_id: string
+          week_number: number
+        }
+        Update: {
+          calendar_synced?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          feedback_log?: string | null
+          forge_objective?: Json | null
+          id?: string
+          knowledge_stack?: Json | null
+          phase?: number
+          status?: string
+          theme?: string
+          updated_at?: string
+          user_id?: string
+          week_number?: number
+        }
+        Relationships: []
+      }
+      weekly_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_completed: boolean | null
+          sort_order: number | null
+          sprint_id: string
+          title: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_completed?: boolean | null
+          sort_order?: number | null
+          sprint_id: string
+          title: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_completed?: boolean | null
+          sort_order?: number | null
+          sprint_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_tasks_sprint_id_fkey"
+            columns: ["sprint_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_sprints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
