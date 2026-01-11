@@ -1,6 +1,8 @@
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import LandingHero from "@/components/LandingHero";
+import FeaturesSection from "@/components/FeaturesSection";
+import AboutSection from "@/components/AboutSection";
 import DiagnosticFlow from "@/components/DiagnosticFlow";
 import ResumeSyncBadge from "@/components/ResumeSyncBadge";
 import { ResumeProvider } from "@/contexts/ResumeContext";
@@ -31,6 +33,12 @@ const Index = () => {
         <main className="relative z-10">
           {/* Landing Hero */}
           <LandingHero onGetStarted={handleGetStarted} />
+          
+          {/* Features Section */}
+          <FeaturesSection />
+          
+          {/* About Section */}
+          <AboutSection />
           
           {/* Diagnostic Flow - shown after clicking Get Started */}
           {showDiagnostic && (
