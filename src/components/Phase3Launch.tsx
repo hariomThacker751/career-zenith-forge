@@ -525,7 +525,7 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                 className="glass-card overflow-hidden"
               >
                 {/* Terminal Header */}
-                <div className="bg-slate-900 dark:bg-slate-950 px-4 py-3 flex items-center gap-2 border-b border-border/30">
+                <div className="bg-slate-950 px-4 py-3 flex items-center gap-2 border-b border-border/30">
                   <div className="flex gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-500/80" />
                     <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
@@ -541,7 +541,7 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
                 </div>
 
                 {/* Terminal Content */}
-                <div className="bg-slate-900 dark:bg-slate-950 p-6 font-mono text-sm text-slate-100 space-y-4">
+                <div className="bg-slate-950 p-6 font-mono text-sm text-slate-100 space-y-4">
                   <div className="flex items-center gap-2 text-emerald-400">
                     <span className="text-muted-foreground">$</span>
                     <span>hackwell evaluate --repo {submissionUrl.split("/").slice(-1)[0]}</span>

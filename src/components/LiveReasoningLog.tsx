@@ -21,11 +21,11 @@ const getTypeStyles = (type: ReasoningEntry["type"]) => {
     case "analysis":
       return "bg-secondary/20 text-secondary";
     case "insight":
-      return "bg-amber-500/20 text-amber-600 dark:text-amber-400";
+      return "bg-amber-500/20 text-amber-400";
     case "decision":
       return "bg-primary/20 text-primary";
     case "action":
-      return "bg-rose-500/20 text-rose-600 dark:text-rose-400";
+      return "bg-rose-500/20 text-rose-400";
     default:
       return "bg-muted text-muted-foreground";
   }

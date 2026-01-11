@@ -10,12 +10,12 @@ interface LandingHeroProps {
 const LandingHero = ({ onGetStarted }: LandingHeroProps) => {
   return (
     <section className="relative min-h-screen pt-24 pb-16 overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 via-background to-slate-50/30 dark:from-teal-950/20 dark:via-background dark:to-slate-950/20" />
+      {/* Background gradient - Dark mode */}
+      <div className="absolute inset-0 bg-gradient-to-br from-teal-950/20 via-background to-slate-950/20" />
       
       {/* Soft gradient blobs */}
-      <div className="absolute top-20 left-1/4 w-[600px] h-[600px] rounded-full blur-3xl opacity-30 bg-gradient-to-br from-teal-200 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20" />
-      <div className="absolute bottom-20 right-1/4 w-[500px] h-[500px] rounded-full blur-3xl opacity-20 bg-gradient-to-br from-slate-200 to-teal-100 dark:from-slate-800/30 dark:to-teal-900/20" />
+      <div className="absolute top-20 left-1/4 w-[600px] h-[600px] rounded-full blur-3xl opacity-30 bg-gradient-to-br from-teal-900/30 to-teal-800/20" />
+      <div className="absolute bottom-20 right-1/4 w-[500px] h-[500px] rounded-full blur-3xl opacity-20 bg-gradient-to-br from-slate-800/30 to-teal-900/20" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center min-h-[calc(100vh-8rem)]">
@@ -74,7 +74,7 @@ const LandingHero = ({ onGetStarted }: LandingHeroProps) => {
               <Button
                 onClick={onGetStarted}
                 size="lg"
-                className="group bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-900 hover:to-slate-800 dark:from-slate-200 dark:to-slate-100 dark:hover:from-white dark:hover:to-slate-50 dark:text-slate-900 text-white font-semibold px-8 py-6 text-lg shadow-xl shadow-slate-900/20 dark:shadow-slate-500/20 transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5"
+                className="group bg-gradient-to-r from-slate-200 to-slate-100 hover:from-white hover:to-slate-50 text-slate-900 font-semibold px-8 py-6 text-lg shadow-xl shadow-slate-500/20 transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5"
               >
                 Start Forging Today
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -89,14 +89,14 @@ const LandingHero = ({ onGetStarted }: LandingHeroProps) => {
               className="space-y-3 pt-4"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-                  <Star className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <div className="w-8 h-8 rounded-lg bg-teal-900/30 flex items-center justify-center">
+                  <Star className="w-4 h-4 text-teal-400" />
                 </div>
                 <span className="text-foreground font-medium">Learn industry-ready skills for free</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-                  <Settings className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <div className="w-8 h-8 rounded-lg bg-teal-900/30 flex items-center justify-center">
+                  <Settings className="w-4 h-4 text-teal-400" />
                 </div>
                 <span className="text-foreground font-medium">One solution for all the JOB Hustle</span>
               </div>
