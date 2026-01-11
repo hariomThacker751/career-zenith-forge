@@ -1,9 +1,9 @@
 // ============= AGENTIC CHAT EDGE FUNCTION =============
-// Handles streaming chat with agentic workflow support
+// Handles streaming chat with agentic workflow support using Perplexity
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createAgent, GeminiAgent, AgentResult } from "../_shared/geminiAgent.ts";
-import { getSecretManager } from "../_shared/secretManager.ts";
+import { getPerplexityApiKey } from "../_shared/perplexity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,9 +32,8 @@ async function handleAgenticChat(
   const userMessage = messages[messages.length - 1]?.content || "";
   
   if (stream) {
-    // Streaming response
     const encoder = new TextEncoder();
-    const stream = new ReadableStream({
+    const streamResponse = new ReadableStream({
       async start(controller) {
         const sendEvent = (event: string, data: any) => {
           controller.enqueue(encoder.encode(createSSEMessage(event, data)));
@@ -74,7 +73,7 @@ async function handleAgenticChat(
       },
     });
 
-    return new Response(stream, {
+    return new Response(streamResponse, {
       headers: {
         ...corsHeaders,
         "Content-Type": "text/event-stream",
@@ -84,7 +83,6 @@ async function handleAgenticChat(
     });
   }
 
-  // Non-streaming response
   const agent = createAgent();
   const result = await agent.run(userMessage);
 
@@ -96,7 +94,6 @@ async function handleAgenticChat(
 async function handleSimpleChat(messages: ChatMessage[]): Promise<Response> {
   const agent = createAgent();
   
-  // Build conversation context
   const systemMessage = messages.find(m => m.role === "system");
   const conversationHistory = messages
     .filter(m => m.role !== "system")
@@ -126,7 +123,6 @@ async function handleSimpleChat(messages: ChatMessage[]): Promise<Response> {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -142,11 +138,11 @@ serve(async (req) => {
       });
     }
 
-    // Check if we have API keys configured
-    const secretManager = getSecretManager();
-    if (!secretManager.hasKeys()) {
+    // Check if we have API key configured
+    const apiKey = getPerplexityApiKey();
+    if (!apiKey) {
       return new Response(JSON.stringify({ 
-        error: "No API keys configured. Please add GEMINI_API_KEY to your secrets.",
+        error: "No API keys configured. Please add PERPLEXITY_API_KEY to your secrets.",
         keyCount: 0,
       }), {
         status: 500,
