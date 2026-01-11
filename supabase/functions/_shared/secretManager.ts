@@ -21,10 +21,10 @@ class SecretManager {
   private loadKeys(): void {
     // Load all available Gemini API keys from environment
     const keyNames = [
-      "GEMINI_API_KEY",
-      "GEMINI_API_KEY_1",
-      "GEMINI_API_KEY_2",
-      "GEMINI_API_KEY_3",
+      "AIzaSyCxVDU2DtxNr8LtYog60yIXlaui4qQ-FZg",
+      "AIzaSyBUwwj97JrQz0MgCbhwxuxXE7dufNFkvoM",
+      "AIzaSyAVsR3zXmmNs6p78xeotcrlUGckwOb5c4g",
+      // "GEMINI_API_KEY_3",
     ];
 
     for (const keyName of keyNames) {
