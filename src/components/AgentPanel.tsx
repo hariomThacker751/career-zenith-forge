@@ -340,7 +340,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
   );
 };
 
-// Fallback insights when AI fails
+// Fallback insights when AI fails - concise one-liners
 function getFallbackInsight(
   agentType: AgentType,
   answers: Record<number, string>,
@@ -355,42 +355,42 @@ function getFallbackInsight(
   switch (agentType) {
     case "profiler":
       if (resumeSkills.length >= 10) {
-        return `The Builder: Advanced profile with ${resumeSkills.length} skills detected. Precision Path recommended—focus on industry specialization.`;
+        return `🎯 The Builder → Precision Path • ${resumeSkills.length} skills detected, ready to specialize.`;
       }
       if (year.includes("1st") || year.includes("2nd")) {
-        return "The Learner: Foundation Path detected. Focus on CS fundamentals and building your first meaningful projects.";
+        return "🎯 The Learner → Foundation Path • Master CS fundamentals first.";
       }
-      return "The Achiever: Precision Path detected. Focus on specialization and production-grade portfolio building.";
+      return "🎯 The Achiever → Precision Path • Build production-grade portfolio.";
 
     case "pulse":
       if (interest.includes("AI")) {
-        return "Hot roles: MLOps Engineer, Agentic AI Developer, AI Safety Researcher. Companies: OpenAI, Anthropic, Google. Must-learn: LangChain + RAG architecture.";
+        return "📈 MLOps Engineer @ Anthropic • Learn: LangGraph • Gap: System Design";
       }
       if (interest.includes("web")) {
-        return "Hot roles: Full-Stack Engineer, Design Engineer. Companies: Vercel, Stripe, Linear. Must-learn: Next.js 15, React Server Components.";
+        return "📈 Design Engineer @ Vercel • Learn: Next.js 15 • Gap: TypeScript";
       }
-      return "Hot roles: Platform Engineer, SRE, Data Engineer. Must-learn: Kubernetes, Go/Rust for systems, observability tools.";
+      return "📈 Platform Engineer @ Stripe • Learn: Kubernetes • Gap: Go/Rust";
 
     case "forge":
       if (level.includes("loop") || level.includes("basic")) {
-        return "CLI Study Scheduler: Automated Pomodoro timer with analytics. Tech: Python, JSON, matplotlib. USP: Learn file I/O and data visualization.";
+        return "🔨 CLI Study Timer • Python + Rich CLI • Ships in 2 weeks";
       }
       if (interest.includes("AI")) {
-        return "Autonomous PR Reviewer: LangChain agent that audits GitHub PRs. Tech: Python, LangChain, GitHub API, ChromaDB. USP: Learns from codebase patterns.";
+        return "🔨 PR Sentinel • LangChain + GitHub API • Ships in 3 weeks";
       }
-      return "Real-time Collab Editor: Multiplayer code editor with AI pair programming. Tech: Next.js, WebSocket, GPT-4. USP: Conflict resolution + live cursors.";
+      return "🔨 Live Collab Editor • Next.js + WebSocket • Ships in 4 weeks";
 
     case "gatekeeper":
       if (resumeSkills.length > 0 && resumeSkills.length < 5) {
-        return "⚠️ Skill Gap Risk: Limited foundation detected. Recommendation: Spend 2 weeks on fundamentals before diving into advanced projects.";
+        return "⚠️ SKILL GAP: Limited foundation → 2 weeks on fundamentals first.";
       }
       if (hours.includes("5-10")) {
-        return "⚠️ Velocity Risk: 5-10 hours may slow progress. Recommendation: Focus on ONE skill deeply rather than spreading thin.";
+        return "⚠️ FOCUS: 5-10 hrs spreads thin → Deep-dive ONE skill instead.";
       }
       if (hours.includes("30+")) {
-        return "⚠️ Burnout Risk: 30+ hours needs rest strategy. Recommendation: Schedule mandatory rest days. Consistency > intensity.";
+        return "⚠️ BURNOUT: 30+ hrs unsustainable → Schedule rest days.";
       }
-      return "✅ Roadmap validated. Success factor: Build in public, document your journey, and seek feedback early.";
+      return "✅ VALIDATED: Build in public for maximum visibility.";
 
     default:
       return "Analysis complete.";
