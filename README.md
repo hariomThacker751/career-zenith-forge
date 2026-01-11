@@ -27,7 +27,7 @@ Follow these steps:
 git clone https://github.com/hariomThacker751/career-zenith-forge.git
 
 # Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+cd Hackwell
 
 # Step 3: Install the necessary dependencies.
 npm i
