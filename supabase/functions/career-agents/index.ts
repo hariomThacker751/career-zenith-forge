@@ -5,6 +5,114 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ========== MULTI-MODEL FALLBACK CONFIGURATION ==========
+// Models ordered by preference: fastest/newest first, then fallbacks
+const MODEL_PRIORITY = [
+  "google/gemini-3-flash-preview",  // Latest, fastest
+  "google/gemini-2.5-flash",        // Balanced performance
+  "google/gemini-2.5-flash-lite",   // Lightweight fallback
+  "google/gemini-2.5-pro",          // Heavy-duty fallback
+];
+
+interface ModelCallResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  statusCode?: number;
+  modelUsed?: string;
+}
+
+// Intelligent model caller with automatic fallback
+async function callWithModelFallback(
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+  options: {
+    tools?: any[];
+    tool_choice?: any;
+    max_tokens?: number;
+    temperature?: number;
+  } = {}
+): Promise<ModelCallResult> {
+  const { tools, tool_choice, max_tokens = 200, temperature = 0.7 } = options;
+  
+  for (let i = 0; i < MODEL_PRIORITY.length; i++) {
+    const model = MODEL_PRIORITY[i];
+    console.log(`Attempting model ${i + 1}/${MODEL_PRIORITY.length}: ${model}`);
+    
+    try {
+      const body: any = {
+        model,
+        messages,
+        max_tokens,
+        temperature,
+      };
+      
+      if (tools) body.tools = tools;
+      if (tool_choice) body.tool_choice = tool_choice;
+      
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      
+      // Handle rate limits - try next model
+      if (response.status === 429) {
+        console.log(`Rate limited on ${model}, trying next model...`);
+        // Add small delay before trying next model
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      
+      // Payment required - can't fallback, return error
+      if (response.status === 402) {
+        return {
+          success: false,
+          error: "AI credits depleted. Please add credits to continue.",
+          statusCode: 402,
+        };
+      }
+      
+      // Server error - try next model
+      if (response.status >= 500) {
+        console.log(`Server error on ${model}: ${response.status}, trying next model...`);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        continue;
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error on ${model}: ${response.status} ${errorText}`);
+        continue;
+      }
+      
+      const data = await response.json();
+      console.log(`Success with model: ${model}`);
+      
+      return {
+        success: true,
+        data,
+        modelUsed: model,
+      };
+    } catch (error) {
+      console.error(`Exception on ${model}:`, error);
+      // Try next model on network/parse errors
+      await new Promise(resolve => setTimeout(resolve, 300));
+      continue;
+    }
+  }
+  
+  // All models failed
+  return {
+    success: false,
+    error: "All AI models are currently unavailable. Please try again later.",
+    statusCode: 503,
+  };
+}
+
 // ========== CAREER MAPPING TYPES & TOOLS ==========
 
 interface QuizAnswers {
@@ -207,45 +315,35 @@ async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> 
   try {
     const prompt = buildCareerMappingPrompt(quizAnswers);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are an expert career advisor. Use the provided tool to structure your career recommendations." },
-          { role: "user", content: prompt }
-        ],
+    const result = await callWithModelFallback(
+      LOVABLE_API_KEY,
+      [
+        { role: "system", content: "You are an expert career advisor. Use the provided tool to structure your career recommendations." },
+        { role: "user", content: prompt }
+      ],
+      {
         tools: [CAREER_MAPPING_TOOL],
-        tool_choice: { type: "function", function: { name: "map_careers" } }
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment.", careers: getFallbackCareers(quizAnswers) }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        tool_choice: { type: "function", function: { name: "map_careers" } },
+        max_tokens: 1000,
+        temperature: 0.7,
       }
-      if (response.status === 402) {
+    );
+
+    if (!result.success) {
+      if (result.statusCode === 402) {
         return new Response(
-          JSON.stringify({ error: "AI credits depleted.", careers: getFallbackCareers(quizAnswers) }),
+          JSON.stringify({ error: result.error, careers: getFallbackCareers(quizAnswers) }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.error("AI gateway error:", response.status);
+      console.log("AI call failed, using fallback careers");
       return new Response(
         JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const result = await response.json();
-    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
+    const toolCall = result.data.choices?.[0]?.message?.tool_calls?.[0];
     
     if (!toolCall) {
       console.error("No tool call in response");
@@ -258,7 +356,7 @@ async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> 
     const parsed = JSON.parse(toolCall.function.arguments);
     
     return new Response(
-      JSON.stringify({ careers: parsed.careers }),
+      JSON.stringify({ careers: parsed.careers, modelUsed: result.modelUsed }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
@@ -383,39 +481,7 @@ RESUME ANALYSIS:
 Analyze this profile and provide your expert assessment.`;
 }
 
-// Retry with exponential backoff
-async function fetchWithRetry(
-  url: string, 
-  options: RequestInit, 
-  maxRetries = 3
-): Promise<Response> {
-  let lastError: Error | null = null;
-  
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const response = await fetch(url, options);
-      
-      // If we get a 5xx error, retry
-      if (response.status >= 500 && i < maxRetries - 1) {
-        const delay = Math.pow(2, i) * 500;
-        console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms due to status ${response.status}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      
-      return response;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (i < maxRetries - 1) {
-        const delay = Math.pow(2, i) * 500;
-        console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms due to error: ${lastError.message}`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-  
-  throw lastError || new Error("Max retries exceeded");
-}
+// Note: fetchWithRetry replaced by callWithModelFallback for better rate limit handling
 
 // Fallback insights when AI fails
 function getFallbackInsight(
@@ -504,47 +570,29 @@ serve(async (req) => {
 
     const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
 
-    console.log(`Processing ${agentType} agent request...`);
+    console.log(`Processing ${agentType} agent request with multi-model fallback...`);
 
-    const response = await fetchWithRetry(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+    const result = await callWithModelFallback(
+      LOVABLE_API_KEY,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContext },
+      ],
       {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContext },
-          ],
-          max_tokens: 200,
-          temperature: 0.7,
-        }),
-      },
-      3
+        max_tokens: 200,
+        temperature: 0.7,
+      }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
+    if (!result.success) {
+      if (result.statusCode === 402) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits depleted. Please add credits to continue." }),
+          JSON.stringify({ error: result.error }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
-      // Return fallback response instead of throwing
+      // Return fallback response for other errors
       const fallbackInsight = getFallbackInsight(agentType, answers, resumeSkills, resumeProjects);
       return new Response(
         JSON.stringify({ insight: fallbackInsight, agentType, fallback: true }),
@@ -552,13 +600,12 @@ serve(async (req) => {
       );
     }
 
-    const data = await response.json();
-    const insight = data.choices?.[0]?.message?.content?.trim() || "Analysis complete.";
+    const insight = result.data.choices?.[0]?.message?.content?.trim() || "Analysis complete.";
 
-    console.log(`${agentType} agent completed successfully`);
+    console.log(`${agentType} agent completed successfully using ${result.modelUsed}`);
 
     return new Response(
-      JSON.stringify({ insight, agentType }),
+      JSON.stringify({ insight, agentType, modelUsed: result.modelUsed }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
