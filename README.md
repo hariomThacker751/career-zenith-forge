@@ -2,7 +2,7 @@
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/27369e30-2a3f-484c-bbe0-19236d0691b9
+**URL**: https://career-zenith-forge.lovable.app
 
 ## How can I edit this code?
 
@@ -10,7 +10,7 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/27369e30-2a3f-484c-bbe0-19236d0691b9) and start prompting.
+Simply visit the [Lovable Project](https://career-zenith-forge.lovable.app) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 
