@@ -1,19 +1,16 @@
-import { ThemeProvider as NextThemesProvider } from "next-themes";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 interface ThemeProviderProps {
   children: ReactNode;
 }
 
+// Dark mode only - no theme switching
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem={false}
-      disableTransitionOnChange={false}
-    >
-      {children}
-    </NextThemesProvider>
-  );
+  useEffect(() => {
+    // Ensure dark mode is always set
+    document.documentElement.classList.add("dark");
+    document.documentElement.style.colorScheme = "dark";
+  }, []);
+
+  return <>{children}</>;
 }

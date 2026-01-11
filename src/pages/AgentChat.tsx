@@ -316,7 +316,7 @@ const AgentChat = () => {
                           {message.taskCount} tasks executed
                         </Badge>
                       )}
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <div className="prose prose-sm prose-invert max-w-none">
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       </div>
                     </Card>

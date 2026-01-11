@@ -2,76 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hackwell Design System - Light & Dark Mode with Smooth UX */
+/* Hackwell Design System - Dark Mode Only */
 
 @layer base {
-  :root {
-    /* Bright clean base */
-    --background: 0 0% 99%;
-    --foreground: 222 47% 11%;
-
-    /* Card surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    /* Electric Emerald - Primary (more vibrant) */
-    --primary: 158 64% 42%;
-    --primary-foreground: 0 0% 100%;
-
-    /* Cyber Indigo - Secondary */
-    --secondary: 243 75% 59%;
-    --secondary-foreground: 0 0% 100%;
-
-    /* Muted surfaces */
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    /* Accent */
-    --accent: 158 64% 95%;
-    --accent-foreground: 158 64% 32%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 158 64% 42%;
-
-    --radius: 1rem;
-
-    /* Custom Hackwell tokens */
-    --emerald: 158 64% 42%;
-    --emerald-glow: 158 84% 50%;
-    --emerald-soft: 158 64% 95%;
-    --indigo: 243 75% 59%;
-    --indigo-glow: 243 75% 70%;
-    --indigo-soft: 243 75% 97%;
-    
-    /* Surface colors */
-    --surface-soft: 210 20% 98%;
-    --surface-hover: 210 20% 95%;
-
-    /* Gradients */
-    --gradient-emerald: linear-gradient(135deg, hsl(158 64% 42%), hsl(158 84% 50%));
-    --gradient-indigo: linear-gradient(135deg, hsl(243 75% 59%), hsl(243 75% 70%));
-    --gradient-sunset: linear-gradient(135deg, hsl(158 64% 42%), hsl(243 75% 59%));
-    --gradient-soft: linear-gradient(135deg, hsl(158 64% 97%), hsl(243 75% 97%));
-
-    --sidebar-background: 0 0% 99%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 158 64% 42%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 158 64% 42%;
-  }
-
-  /* Dark mode colors - Hackwell Addictive Dark Theme */
-  /* Primary: #0F0F0F, Cards: #1F2937, Accent: #10B981 */
+  :root,
   .dark {
     /* #0F0F0F - Pure dark background */
     --background: 0 0% 6%;
@@ -106,6 +40,8 @@
     --input: 215 28% 20%;
     --ring: 160 84% 39%;
 
+    --radius: 1rem;
+
     /* Emerald tokens - #10B981 based */
     --emerald: 160 84% 39%;
     --emerald-glow: 160 84% 50%;
@@ -119,6 +55,12 @@
     /* Surface variations */
     --surface-soft: 215 28% 10%;
     --surface-hover: 215 28% 14%;
+
+    /* Gradients */
+    --gradient-emerald: linear-gradient(135deg, hsl(160 84% 39%), hsl(160 84% 50%));
+    --gradient-indigo: linear-gradient(135deg, hsl(243 75% 65%), hsl(243 75% 75%));
+    --gradient-sunset: linear-gradient(135deg, hsl(160 84% 39%), hsl(243 75% 65%));
+    --gradient-soft: linear-gradient(135deg, hsl(160 84% 12%), hsl(243 75% 12%));
 
     /* Sidebar */
     --sidebar-background: 0 0% 6%;
