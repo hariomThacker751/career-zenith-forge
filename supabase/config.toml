@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.evaluate-repo]
 verify_jwt = false
+
+[functions.agentic-chat]
+verify_jwt = false
