@@ -3,16 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Shield, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const navLinks = [
     { name: "Features", href: "#features" },
     { name: "Roadmap", href: "#roadmap" },
     { name: "About", href: "#about" },
-    { name: "Dashboard", href: "/dashboard", isRoute: true },
+    // Only show Dashboard link when user is logged in
+    ...(user ? [{ name: "Dashboard", href: "/dashboard", isRoute: true }] : []),
   ];
 
   const scrollToSection = (href: string, isRoute?: boolean) => {
