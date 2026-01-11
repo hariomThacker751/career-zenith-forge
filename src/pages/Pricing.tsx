@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, Shield, Code, Lightbulb, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -12,6 +12,29 @@ import {
 } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import { useNavigate } from "react-router-dom";
+
+const aboutValues = [
+  {
+    icon: Shield,
+    title: "Technically Rigorous",
+    description: "We don't cut corners. Our curriculum is built on real industry standards and best practices."
+  },
+  {
+    icon: Code,
+    title: "Project-First Approach",
+    description: "Theory without practice is meaningless. Build real projects that matter to employers."
+  },
+  {
+    icon: Lightbulb,
+    title: "Brutally Honest",
+    description: "No false promises. We tell you exactly what it takes to succeed in tech."
+  },
+  {
+    icon: Heart,
+    title: "Student-Centered",
+    description: "Your goals drive everything. Personalized paths, not one-size-fits-all solutions."
+  }
+];
 
 interface PricingTier {
   name: string;
@@ -187,25 +210,47 @@ const Pricing = () => {
             ))}
           </div>
 
-          {/* University/Bootcamp Section */}
+          {/* About Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="rounded-2xl border border-border bg-card p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+            className="mt-16"
           >
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                University / Bootcamp
+            <div className="text-center mb-10">
+              <span className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20 mb-4">
+                About Hackwell
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
+                Built by developers,{" "}
+                <span className="bg-gradient-to-r from-teal-500 to-emerald-500 bg-clip-text text-transparent">
+                  for developers
+                </span>
+              </h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                Hackwell was born from frustration with scattered resources and generic advice. 
+                We built the platform we wished existed—one that combines AI-powered personalization 
+                with mentorship principles.
               </p>
-              <h3 className="text-2xl font-bold text-foreground">Custom</h3>
             </div>
-            <Button
-              variant="outline"
-              className="border-teal-500 text-teal-500 hover:bg-teal-500/10"
-            >
-              Partner with us
-            </Button>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {aboutValues.map((value, index) => (
+                <motion.div
+                  key={value.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+                  className="p-5 rounded-xl bg-card border border-border/50 hover:border-teal-500/30 transition-all duration-300 group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500/20 to-emerald-500/20 flex items-center justify-center mb-3 group-hover:from-teal-500/30 group-hover:to-emerald-500/30 transition-colors">
+                    <value.icon className="w-5 h-5 text-teal-400" />
+                  </div>
+                  <h3 className="font-semibold text-foreground mb-1">{value.title}</h3>
+                  <p className="text-sm text-muted-foreground">{value.description}</p>
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
         </div>
       </main>
