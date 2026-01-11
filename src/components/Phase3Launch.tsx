@@ -184,23 +184,21 @@ const Phase3Launch = ({ answers }: Phase3LaunchProps) => {
             .single();
 
           if (sprintData) {
-            // Create tasks from forge objective deliverables
-            for (let i = 0; i < sprint.forgeObjective.deliverables.length; i++) {
-              const { data: existingTask } = await supabase
-                .from("weekly_tasks")
-                .select("id")
-                .eq("sprint_id", sprintData.id)
-                .eq("title", sprint.forgeObjective.deliverables[i])
-                .single();
+            // Delete existing tasks for this sprint to ensure clean slate
+            await supabase
+              .from("weekly_tasks")
+              .delete()
+              .eq("sprint_id", sprintData.id);
 
-              if (!existingTask) {
-                await supabase.from("weekly_tasks").insert({
-                  sprint_id: sprintData.id,
-                  title: sprint.forgeObjective.deliverables[i],
-                  sort_order: i + 1,
-                  is_completed: false,
-                });
-              }
+            // Create fresh tasks from forge objective deliverables (all unchecked)
+            for (let i = 0; i < sprint.forgeObjective.deliverables.length; i++) {
+              await supabase.from("weekly_tasks").insert({
+                sprint_id: sprintData.id,
+                title: sprint.forgeObjective.deliverables[i],
+                sort_order: i + 1,
+                is_completed: false,
+                completed_at: null,
+              });
             }
           }
         }
