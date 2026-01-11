@@ -20,6 +20,15 @@ const Navbar = () => {
   const scrollToSection = (href: string, isRoute?: boolean) => {
     setIsMenuOpen(false);
     
+    // Handle Home - scroll to top
+    if (href === "/") {
+      if (location.pathname !== "/") {
+        navigate("/");
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    
     if (isRoute) {
       navigate(href);
       return;
