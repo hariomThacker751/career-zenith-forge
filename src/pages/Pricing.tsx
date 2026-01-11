@@ -52,49 +52,49 @@ interface PricingTier {
 
 const pricingTiers: PricingTier[] = [
   {
-    name: "Student",
-    description: "For ambitious students building foundational skills.",
-    monthlyPrice: 12,
-    annualPrice: 9,
-    features: ["Basic roadmaps", "Community access"],
+    name: "Free",
+    description: "Get started with the basics at no cost.",
+    monthlyPrice: 0,
+    annualPrice: 0,
+    features: ["Basic roadmap", "Community access", "Self-paced learning"],
     dropdown: {
-      label: "Limited project feedback",
-      options: ["2 projects/month", "Basic AI review", "Community support"],
+      label: "What's included",
+      options: ["Career path overview", "Resource library", "Community forums"],
     },
-    cta: "Start your journey",
+    cta: "Get Started Free",
   },
   {
-    name: "Professional",
-    description: "For early-career professionals seeking rapid growth.",
-    monthlyPrice: 39,
-    annualPrice: 29,
-    features: ["Personalized roadmaps", "Priority project review"],
+    name: "Operator",
+    description: "Personalized guidance to accelerate your growth.",
+    monthlyPrice: 499,
+    annualPrice: 399,
+    features: ["Personalized tracking", "Custom roadmaps", "Progress analytics", "Priority support"],
     dropdown: {
-      label: "Interview prep resources",
-      options: ["Mock interviews", "Resume review", "LinkedIn optimization"],
+      label: "Advanced features",
+      options: ["AI-powered insights", "Weekly progress reports", "Skill assessments"],
     },
-    cta: "Accelerate your growth",
+    cta: "Upgrade to Operator",
     highlight: true,
   },
   {
-    name: "Mentorship",
-    description: "For those committed to achieving their dream role.",
-    monthlyPrice: 129,
-    annualPrice: 99,
-    features: ["1-on-1 mentorship", "Unlimited project feedback"],
+    name: "Premium",
+    description: "Elite experience with guaranteed results.",
+    monthlyPrice: 1999,
+    annualPrice: 1599,
+    features: ["1-to-1 mentorship", "Personalized tracks & roadmaps", "Guaranteed goal achieved", "Direct mentor access"],
     dropdown: {
-      label: "Career strategy sessions",
-      options: ["Weekly calls", "Goal setting", "Network introductions"],
+      label: "Elite benefits",
+      options: ["Weekly 1:1 calls", "Career strategy sessions", "Network introductions", "Job placement support"],
     },
-    cta: "Achieve your dream role",
+    cta: "Go Premium",
   },
 ];
 
 const Pricing = () => {
   const [annualBilling, setAnnualBilling] = useState<Record<string, boolean>>({
-    Student: true,
-    Professional: true,
-    Mentorship: true,
+    Free: false,
+    Operator: true,
+    Premium: true,
   });
   const navigate = useNavigate();
 
@@ -154,30 +154,38 @@ const Pricing = () => {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold text-teal-500">
-                      €{annualBilling[tier.name] ? tier.annualPrice : tier.monthlyPrice}
+                      ₹{annualBilling[tier.name] ? tier.annualPrice : tier.monthlyPrice}
                     </span>
-                    <span className="text-muted-foreground">/month</span>
+                    {tier.monthlyPrice > 0 && (
+                      <span className="text-muted-foreground">/month</span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={annualBilling[tier.name]}
-                      onCheckedChange={() => toggleBilling(tier.name)}
-                      className="data-[state=checked]:bg-teal-600"
-                    />
-                    <span className="text-sm text-muted-foreground">Annual</span>
-                  </div>
+                  {tier.monthlyPrice > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={annualBilling[tier.name]}
+                        onCheckedChange={() => toggleBilling(tier.name)}
+                        className="data-[state=checked]:bg-teal-600"
+                      />
+                      <span className="text-sm text-muted-foreground">Annual</span>
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-6">
-                  {annualBilling[tier.name] ? "billed annually" : "billed monthly"}
+                  {tier.monthlyPrice === 0 
+                    ? "Free forever" 
+                    : annualBilling[tier.name] ? "billed annually" : "billed monthly"}
                 </p>
 
                 {/* CTA Button */}
                 <Button
                   onClick={() => navigate("/auth")}
                   className={`w-full mb-6 font-semibold ${
-                    tier.name === "Mentorship"
-                      ? "bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700"
-                      : "bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600"
+                    tier.name === "Premium"
+                      ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                      : tier.name === "Operator"
+                      ? "bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600"
+                      : "bg-secondary hover:bg-secondary/80 text-secondary-foreground"
                   }`}
                 >
                   {tier.cta}
