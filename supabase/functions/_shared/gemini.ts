@@ -2,7 +2,7 @@
 // Uses Google's Gemini API directly with gemini-2.5-flash model
 
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-2.5-flash-preview-05-20";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export interface GeminiMessage {
   role: "user" | "model";
