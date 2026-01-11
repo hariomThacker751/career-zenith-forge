@@ -573,7 +573,10 @@ export const WeeklyMissionCard = ({
                   Try Again
                 </Button>
                 <Button
-                  onClick={() => window.open(githubUrl, "_blank")}
+                  onClick={() => {
+                    const url = githubUrl.startsWith("http") ? githubUrl : `https://${githubUrl}`;
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  }}
                   variant="outline"
                   className="flex-1 h-12 border-border/50"
                 >
