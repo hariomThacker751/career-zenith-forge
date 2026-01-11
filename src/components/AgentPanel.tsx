@@ -252,7 +252,7 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
               >
                 <agent.icon className="w-5 h-5 text-primary" />
               </motion.div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 min-h-[60px]">
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-sm font-bold bg-gradient-to-r ${agent.gradient} bg-clip-text text-transparent`}>
                     {agent.name}
@@ -282,31 +282,33 @@ const AgentPanel = ({ answers, onAnalysisComplete }: AgentPanelProps) => {
                   )}
                 </div>
 
-                {isProcessing && !insight && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">{agent.description}</p>
-                    <div className="shimmer h-4 rounded w-3/4" />
-                  </div>
-                )}
+                <div className="min-h-[40px]">
+                  {isProcessing && !insight && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">{agent.description}</p>
+                      <div className="shimmer h-4 rounded w-3/4" />
+                    </div>
+                  )}
 
-                {isComplete && insight && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
-                  >
-                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                      {insight}
-                    </p>
-                  </motion.div>
-                )}
+                  {isComplete && insight && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {insight}
+                      </p>
+                    </motion.div>
+                  )}
 
-                {!isProcessing && !isComplete && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Waiting...</p>
-                    <div className="shimmer h-4 rounded w-1/2" />
-                  </div>
-                )}
+                  {!isProcessing && !isComplete && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Waiting...</p>
+                      <div className="shimmer h-4 rounded w-1/2" />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
