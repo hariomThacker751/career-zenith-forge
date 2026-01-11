@@ -5,84 +5,92 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ========== MULTI-MODEL FALLBACK CONFIGURATION ==========
-const MODEL_PRIORITY = [
-  "google/gemini-3-flash-preview",
-  "google/gemini-2.5-flash",
-  "google/gemini-2.5-flash-lite",
-  "google/gemini-2.5-pro",
-];
+// ========== GEMINI API DIRECT INTEGRATION ==========
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_MODEL = "gemini-2.5-flash-preview-05-20";
 
-interface ModelCallResult {
-  success: boolean;
-  data?: any;
-  error?: string;
-  statusCode?: number;
-  modelUsed?: string;
+interface GeminiResponse {
+  candidates: Array<{
+    content: {
+      parts: Array<{ text?: string; functionCall?: { name: string; args: any } }>;
+      role: string;
+    };
+    finishReason: string;
+  }>;
 }
 
-async function callWithModelFallback(
+interface GeminiCallResult {
+  success: boolean;
+  text?: string;
+  toolCall?: { name: string; args: any };
+  error?: string;
+  statusCode?: number;
+}
+
+async function callGemini(
   apiKey: string,
-  messages: Array<{ role: string; content: string }>,
-  options: {
-    tools?: any[];
-    tool_choice?: any;
-    max_tokens?: number;
-    temperature?: number;
-  } = {}
-): Promise<ModelCallResult> {
-  const { tools, tool_choice, max_tokens = 2000, temperature = 0.7 } = options;
-  
-  for (let i = 0; i < MODEL_PRIORITY.length; i++) {
-    const model = MODEL_PRIORITY[i];
-    console.log(`Attempting model ${i + 1}/${MODEL_PRIORITY.length}: ${model}`);
-    
-    try {
-      const body: any = { model, messages, max_tokens, temperature };
-      if (tools) body.tools = tools;
-      if (tool_choice) body.tool_choice = tool_choice;
-      
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      
-      if (response.status === 429) {
-        console.log(`Rate limited on ${model}, trying next model...`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        continue;
-      }
-      
-      if (response.status === 402) {
-        return { success: false, error: "AI credits depleted.", statusCode: 402 };
-      }
-      
-      if (response.status >= 500) {
-        console.log(`Server error on ${model}, trying next...`);
-        await new Promise(resolve => setTimeout(resolve, 300));
-        continue;
-      }
-      
-      if (!response.ok) {
-        console.error(`Error on ${model}: ${response.status}`);
-        continue;
-      }
-      
-      const data = await response.json();
-      console.log(`Success with model: ${model}`);
-      return { success: true, data, modelUsed: model };
-    } catch (error) {
-      console.error(`Exception on ${model}:`, error);
-      await new Promise(resolve => setTimeout(resolve, 300));
-      continue;
-    }
+  systemPrompt: string,
+  userPrompt: string,
+  options: { tools?: any[]; maxOutputTokens?: number } = {}
+): Promise<GeminiCallResult> {
+  const { tools, maxOutputTokens = 4000 } = options;
+
+  const url = `${GEMINI_API_URL}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
+
+  const body: any = {
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { temperature: 0.7, maxOutputTokens },
+  };
+
+  if (tools && tools.length > 0) {
+    body.tools = [{
+      functionDeclarations: tools.map((t: any) => ({
+        name: t.function.name,
+        description: t.function.description,
+        parameters: t.function.parameters,
+      })),
+    }];
+    body.toolConfig = { functionCallingConfig: { mode: "ANY" } };
   }
-  
-  return { success: false, error: "All AI models unavailable.", statusCode: 503 };
+
+  try {
+    console.log(`Calling Gemini: ${DEFAULT_MODEL}`);
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (response.status === 429) {
+      return { success: false, error: "Rate limit exceeded.", statusCode: 429 };
+    }
+
+    if (response.status === 403) {
+      return { success: false, error: "Invalid GEMINI_API_KEY.", statusCode: 403 };
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Gemini error: ${response.status} ${errText}`);
+      return { success: false, error: `API error: ${response.status}`, statusCode: response.status };
+    }
+
+    const data: GeminiResponse = await response.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+
+    const fnCall = parts.find((p) => p.functionCall);
+    if (fnCall?.functionCall) {
+      return { success: true, toolCall: { name: fnCall.functionCall.name, args: fnCall.functionCall.args } };
+    }
+
+    const textPart = parts.find((p) => p.text);
+    return { success: true, text: textPart?.text || "" };
+  } catch (error) {
+    console.error("Gemini call failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error", statusCode: 500 };
+  }
 }
 
 interface AgentInsights {
@@ -105,8 +113,8 @@ interface RequestData {
     techStack: string[];
     difficulty: string;
   };
-  targetCareer?: string; // From Explore Mode
-  exploreAnswers?: Record<string, string[]>; // Quiz answers from Explore Mode
+  targetCareer?: string;
+  exploreAnswers?: Record<string, string[]>;
 }
 
 const PHASE1_TOOL = {
@@ -122,15 +130,11 @@ const PHASE1_TOOL = {
           items: {
             type: "object",
             properties: {
-              id: { type: "string", description: "Unique kebab-case identifier" },
-              title: { type: "string", description: "Course/resource title" },
-              source: { type: "string", description: "Platform or provider name" },
-              modules: { 
-                type: "array", 
-                items: { type: "string" },
-                description: "4-6 key learning modules"
-              },
-              duration: { type: "string", description: "Estimated time like '4 weeks'" },
+              id: { type: "string" },
+              title: { type: "string" },
+              source: { type: "string" },
+              modules: { type: "array", items: { type: "string" } },
+              duration: { type: "string" },
               level: { type: "string", enum: ["Beginner", "Intermediate", "Advanced"] }
             },
             required: ["id", "title", "source", "modules", "duration", "level"]
@@ -155,19 +159,11 @@ const PHASE2_TOOL = {
           items: {
             type: "object",
             properties: {
-              title: { type: "string", description: "Catchy project name" },
-              description: { type: "string", description: "2-3 sentence overview" },
-              techStack: { 
-                type: "array", 
-                items: { type: "string" },
-                description: "5-6 technologies"
-              },
-              features: { 
-                type: "array", 
-                items: { type: "string" },
-                description: "5 core features"
-              },
-              timeline: { type: "string", description: "Estimated completion time" },
+              title: { type: "string" },
+              description: { type: "string" },
+              techStack: { type: "array", items: { type: "string" } },
+              features: { type: "array", items: { type: "string" } },
+              timeline: { type: "string" },
               difficulty: { type: "string", enum: ["Intermediate", "Advanced"] }
             },
             required: ["title", "description", "techStack", "features", "timeline", "difficulty"]
@@ -183,7 +179,7 @@ const PHASE3_TOOL = {
   type: "function",
   function: {
     name: "generate_weekly_sprints",
-    description: "Generate a 6-month (24-week) roadmap broken into weekly sprints with verified, working resource links",
+    description: "Generate 8 weekly sprints with learning resources",
     parameters: {
       type: "object",
       properties: {
@@ -192,40 +188,35 @@ const PHASE3_TOOL = {
           items: {
             type: "object",
             properties: {
-              week: { type: "number", description: "Week number 1-24" },
-              theme: { type: "string", description: "Clear title for the week, e.g., 'Mastering Asynchronous State Management'" },
+              week: { type: "number" },
+              theme: { type: "string" },
               knowledgeStack: {
                 type: "array",
                 items: {
                   type: "object",
                   properties: {
-                    title: { type: "string", description: "Exact resource/playlist title" },
-                    source: { type: "string", description: "Platform: YouTube, MIT OCW, CS50, freeCodeCamp, Coursera, official docs" },
-                    url: { type: "string", description: "VERIFIED working URL - must be real and accessible" },
+                    title: { type: "string" },
+                    source: { type: "string" },
+                    url: { type: "string" },
                     type: { type: "string", enum: ["youtube", "course", "documentation", "tutorial", "repository"] },
-                    instructor: { type: "string", description: "Channel name or instructor (for YouTube)" }
+                    instructor: { type: "string" }
                   },
                   required: ["title", "source", "url", "type"]
-                },
-                description: "2-3 BEST-IN-CLASS free learning sources including YouTube playlists"
+                }
               },
               forgeObjective: {
                 type: "object",
                 properties: {
-                  milestone: { type: "string", description: "Specific project milestone for the week" },
-                  deliverables: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "3 major tasks/deliverables for this milestone"
-                  }
+                  milestone: { type: "string" },
+                  deliverables: { type: "array", items: { type: "string" } }
                 },
                 required: ["milestone", "deliverables"]
               },
               calendarEvent: {
                 type: "object",
                 properties: {
-                  summary: { type: "string", description: "Calendar event title" },
-                  description: { type: "string", description: "Event description with to-do list" }
+                  summary: { type: "string" },
+                  description: { type: "string" }
                 },
                 required: ["summary", "description"]
               }
@@ -233,7 +224,7 @@ const PHASE3_TOOL = {
             required: ["week", "theme", "knowledgeStack", "forgeObjective", "calendarEvent"]
           }
         },
-        totalWeeks: { type: "number", description: "Total number of weeks in the roadmap" }
+        totalWeeks: { type: "number" }
       },
       required: ["sprints", "totalWeeks"]
     }
@@ -242,234 +233,123 @@ const PHASE3_TOOL = {
 
 function buildPhase1Prompt(data: RequestData): string {
   const targetCareerSection = data.targetCareer 
-    ? `\n## TARGET CAREER (from Explore Mode): ${data.targetCareer}
-This user has already selected their target career. All learning paths MUST be specifically tailored to help them become a ${data.targetCareer}.`
+    ? `TARGET CAREER: ${data.targetCareer}. All paths MUST be specifically tailored for ${data.targetCareer}.`
     : "";
 
-  // Handle both old format (hobbies, interests, etc.) and new format (academic_position, skill_level, etc.)
-  const exploreContext = data.exploreAnswers
-    ? `\n## Explore Mode Profile:
-- Academic Position: ${data.exploreAnswers.academic_position?.join(", ") || data.exploreAnswers.year?.join(", ") || "Not specified"}
-- Skill Level: ${data.exploreAnswers.skill_level?.join(", ") || "Not specified"}
-- Work Energy: ${data.exploreAnswers.work_energy?.join(", ") || data.exploreAnswers.interests?.join(", ") || "Not specified"}
-- Constraints: ${data.exploreAnswers.constraints?.join(", ") || "Flexible"}
-- Build Idea: ${data.exploreAnswers.build_idea?.join(", ") || "Not specified"}
-- Current Skills: ${data.exploreAnswers.skills?.join(", ") || "Not specified"}
-- Branch/Major: ${data.exploreAnswers.branch?.join(", ") || "Not specified"}`
-    : "";
-
-  return `You are an expert career advisor. Based on the following AI agent insights and user profile, generate 3-5 highly personalized learning paths to close skill gaps.
+  return `Generate 3-5 personalized learning paths.
 ${targetCareerSection}
-${exploreContext}
 
 ## Agent Insights:
 - PROFILER: ${data.agentInsights.profiler}
-- PULSE (Industry Trends): ${data.agentInsights.pulse}
-- GATEKEEPER (Risks): ${data.agentInsights.gatekeeper}
+- PULSE: ${data.agentInsights.pulse}
+- GATEKEEPER: ${data.agentInsights.gatekeeper}
 
 ## User Profile:
 - Year: ${data.answers[0] || "Not specified"}
 - Interest: ${data.answers[1] || "Not specified"}
 - Skill Level: ${data.answers[2] || "Not specified"}
-- Available Hours/Week: ${data.answers[3] || "Not specified"}
-- Goal: ${data.answers[4] || "Not specified"}
-- Current Skills: ${data.resumeSkills.join(", ") || "None detected"}
-- Past Projects: ${data.resumeProjects.join(", ") || "None"}
+- Hours/Week: ${data.answers[3] || "Not specified"}
+- Skills: ${data.resumeSkills.join(", ") || "None"}
 
-## Requirements:
-1. Each path should address a specific skill gap for ${data.targetCareer || "their goal"}
-2. Include real courses from platforms like Coursera, edX, Udemy, fast.ai, etc.
-3. Order by priority (most critical gap first)
-4. Consider their available time when setting durations
-5. Match difficulty to their current skill level
-6. ${data.targetCareer ? `FOCUS ALL PATHS on skills needed for ${data.targetCareer}` : "Focus on closing skill gaps identified by agents"}`;
+Requirements:
+1. Address specific skill gaps
+2. Use real courses (Coursera, edX, Udemy, fast.ai)
+3. Order by priority
+4. Match difficulty to skill level`;
 }
 
 function buildPhase2Prompt(data: RequestData): string {
   const targetCareerSection = data.targetCareer 
-    ? `\n## TARGET CAREER: ${data.targetCareer}
-All projects MUST be specifically designed for someone pursuing a career as ${data.targetCareer}. The projects should directly build portfolio pieces relevant to ${data.targetCareer} roles.`
+    ? `TARGET CAREER: ${data.targetCareer}. Projects must be portfolio pieces for ${data.targetCareer} roles.`
     : "";
 
-  return `You are THE FORGE - an expert project architect. Generate 2-3 high-impact, 2026-relevant project ideas.
+  return `Generate 2-3 high-impact, 2026-relevant project ideas.
 ${targetCareerSection}
 
 ## Agent Insights:
 - FORGE: ${data.agentInsights.forge}
-- PULSE (Industry Trends): ${data.agentInsights.pulse}
-- PROFILER: ${data.agentInsights.profiler}
+- PULSE: ${data.agentInsights.pulse}
 
 ## User Profile:
 - Interest: ${data.answers[1] || "Not specified"}
 - Skill Level: ${data.answers[2] || "Not specified"}
-- Goal: ${data.answers[4] || "Not specified"}
-- Current Skills: ${data.resumeSkills.join(", ") || "None"}
-- Selected Learning Paths: ${data.selectedLearningPaths?.join(", ") || "None"}
+- Skills: ${data.resumeSkills.join(", ") || "None"}
+- Learning Paths: ${data.selectedLearningPaths?.join(", ") || "None"}
 
-## Requirements:
-1. NO todo apps, weather apps, or basic CRUD - these are INDUSTRY projects
-2. Each project should solve a REAL problem ${data.targetCareer ? `relevant to ${data.targetCareer}` : ""}
-3. Include modern 2024-2026 tech stacks (AI, real-time, etc.)
-4. Projects should be completable in 4-8 weeks
-5. ${data.targetCareer ? `Projects MUST be impressive for ${data.targetCareer} job applications` : "Include at least one AI/ML project if user showed interest"}
-6. Features should be specific and impressive for portfolio`;
+Requirements:
+1. NO todo apps, weather apps, or basic CRUD
+2. Solve REAL problems
+3. Modern 2024-2026 tech stacks (AI, real-time)
+4. Completable in 4-8 weeks`;
 }
 
 function buildPhase3Prompt(data: RequestData): string {
   const project = data.selectedProject;
-  const skillLevel = data.answers[2] || "Intermediate";
-  const interest = data.answers[1] || "Web Development";
-  const year = data.answers[0] || "2nd year";
-  
   const targetCareerSection = data.targetCareer 
-    ? `\n## TARGET CAREER: ${data.targetCareer}
-This roadmap is specifically for someone pursuing a career as ${data.targetCareer}. All learning resources and milestones should directly contribute to landing a job as ${data.targetCareer}.`
+    ? `TARGET CAREER: ${data.targetCareer}. Roadmap for landing a job as ${data.targetCareer}.`
     : "";
 
-  return `You are THE HACKWELL DYNAMIC ORCHESTRATOR - the world's most advanced Career Intelligence Agent. Create a 6-month (24-week) learning roadmap using WEEKLY SPRINTS with THE BEST learning resources available.
+  return `Create 8 weekly sprints with THE BEST free learning resources.
 ${targetCareerSection}
 
 ## Target Project:
 - Title: ${project?.title || "Unknown"}
-- Description: ${project?.description || "Unknown"}
 - Tech Stack: ${project?.techStack?.join(", ") || "Unknown"}
 - Difficulty: ${project?.difficulty || "Unknown"}
 
 ## User Profile:
-- Year: ${year}
-- Interest Area: ${interest}
-- Skill Level: ${skillLevel}
-- Available Hours/Week: ${data.answers[3] || "10-15 hours"}
-- Current Skills: ${data.resumeSkills?.join(", ") || "Not specified"}
-- Goal: ${data.targetCareer ? `Become a ${data.targetCareer}` : (data.answers[4] || "Build portfolio projects")}
+- Year: ${data.answers[0]}
+- Skill Level: ${data.answers[2]}
+- Hours/Week: ${data.answers[3] || "10-15"}
+- Skills: ${data.resumeSkills?.join(", ") || "Not specified"}
 
-## Agent Insights:
-- PROFILER: ${data.agentInsights.profiler}
-- PULSE (Industry Trends): ${data.agentInsights.pulse}
-- FORGE: ${data.agentInsights.forge}
-- GATEKEEPER (Risks): ${data.agentInsights.gatekeeper}
+## VERIFIED YOUTUBE CHANNELS (use these):
+- Traversy Media, Fireship, Net Ninja, freeCodeCamp.org, Web Dev Simplified, Academind
 
-## CRITICAL REQUIREMENTS FOR KNOWLEDGE STACK:
-Generate 8 weekly sprints. For each week's Knowledge Stack, you MUST use ONLY these VERIFIED, WORKING resources:
+## VERIFIED COURSES (use these):
+- CS50: https://cs50.harvard.edu/x/
+- Full Stack Open: https://fullstackopen.com/en/
+- The Odin Project: https://www.theodinproject.com/
 
-### PREMIUM YOUTUBE CHANNELS (use exact playlist URLs):
-- **Traversy Media**: https://www.youtube.com/@TraversyMedia/playlists
-- **Fireship**: https://www.youtube.com/@Fireship/playlists  
-- **The Coding Train**: https://www.youtube.com/@TheCodingTrain/playlists
-- **Net Ninja**: https://www.youtube.com/@NetNinja/playlists
-- **Corey Schafer** (Python): https://www.youtube.com/@coreyms/playlists
-- **Web Dev Simplified**: https://www.youtube.com/@WebDevSimplified/playlists
-- **Tech With Tim**: https://www.youtube.com/@TechWithTim/playlists
-- **freeCodeCamp.org**: https://www.youtube.com/@freecodecamp/playlists
-- **Academind**: https://www.youtube.com/@academind/playlists
-- **Programming with Mosh**: https://www.youtube.com/@programmingwithmosh/playlists
-
-### VERIFIED COURSE PLATFORMS (use exact course URLs):
-- **CS50**: https://cs50.harvard.edu/x/
-- **MIT OCW**: https://ocw.mit.edu/
-- **freeCodeCamp**: https://www.freecodecamp.org/learn/
-- **The Odin Project**: https://www.theodinproject.com/
-- **University of Helsinki Python**: https://programming-24.mooc.fi/
-- **Full Stack Open**: https://fullstackopen.com/en/
-- **Scrimba**: https://scrimba.com/learn/
-
-### OFFICIAL DOCUMENTATION (always working):
-- React: https://react.dev/learn
-- TypeScript: https://www.typescriptlang.org/docs/handbook/
-- Python: https://docs.python.org/3/tutorial/
-- MDN Web Docs: https://developer.mozilla.org/en-US/docs/Learn
-
-## EACH WEEK MUST INCLUDE:
-
-1. **Theme**: Clear, inspiring title (e.g., "Week 4: Mastering Asynchronous State Management")
-
-2. **Knowledge Stack (2-3 sources)**: 
-   - Include at least ONE YouTube playlist from the verified list above
-   - Include ONE official documentation or course
-   - ALL URLs must be REAL and WORKING - no made-up links
-   - Include the instructor/channel name for YouTube resources
-   - Match difficulty to ${year} ${skillLevel} level
-
-3. **Forge Objective**:
-   - Specific PROJECT MILESTONE building toward ${project?.title || 'the final project'}
-   - Include 3 specific deliverables
-
-4. **Calendar Event**:
-   - Single "Weekly Challenge" summary with to-do list
-
-Make progression logical: fundamentals → intermediate concepts → advanced integrations.`;
+Each week needs: theme, 2-3 knowledge stack resources, forge objective with 3 deliverables, calendar event.`;
 }
 
 interface ToolDefinition {
   type: string;
-  function: {
-    name: string;
-    description: string;
-    parameters: object;
-  };
+  function: { name: string; description: string; parameters: object };
 }
 
 async function callAI(systemPrompt: string, tool: ToolDefinition): Promise<any> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    throw new Error("LOVABLE_API_KEY not configured");
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY not configured");
   }
 
-  const result = await callWithModelFallback(
-    LOVABLE_API_KEY,
-    [
-      { role: "system", content: "You are an expert career advisor and project architect. Always use the provided tool to structure your response." },
-      { role: "user", content: systemPrompt }
-    ],
-    {
-      tools: [tool],
-      tool_choice: { type: "function", function: { name: tool.function.name } },
-      max_tokens: 4000,
-    }
+  const result = await callGemini(
+    GEMINI_API_KEY,
+    "You are an expert career advisor and project architect. Always use the provided tool to structure your response.",
+    systemPrompt,
+    { tools: [tool], maxOutputTokens: 4000 }
   );
 
   if (!result.success) {
     throw new Error(result.error || "AI call failed");
   }
 
-  const toolCall = result.data.choices?.[0]?.message?.tool_calls?.[0];
-  
-  if (!toolCall) {
+  if (!result.toolCall) {
     throw new Error("No tool call in response");
   }
 
-  console.log(`AI call succeeded with model: ${result.modelUsed}`);
-  return JSON.parse(toolCall.function.arguments);
+  return result.toolCall.args;
 }
 
-// Fallback content when AI fails
+// Fallback content
 function getFallbackPhase1(): { paths: any[] } {
   return {
     paths: [
-      {
-        id: "cs-fundamentals",
-        title: "Computer Science Fundamentals",
-        source: "MIT OpenCourseWare",
-        modules: ["Data Structures", "Algorithms", "System Design", "Databases"],
-        duration: "8 weeks",
-        level: "Intermediate"
-      },
-      {
-        id: "modern-web-dev",
-        title: "Modern Web Development",
-        source: "Frontend Masters",
-        modules: ["React 19", "TypeScript", "Next.js 15", "Tailwind CSS"],
-        duration: "6 weeks",
-        level: "Intermediate"
-      },
-      {
-        id: "ai-ml-basics",
-        title: "AI & Machine Learning Basics",
-        source: "fast.ai + DeepLearning.AI",
-        modules: ["Python for ML", "Neural Networks", "LLM Fundamentals", "Prompt Engineering"],
-        duration: "6 weeks",
-        level: "Intermediate"
-      }
+      { id: "cs-fundamentals", title: "Computer Science Fundamentals", source: "MIT OpenCourseWare", modules: ["Data Structures", "Algorithms", "System Design", "Databases"], duration: "8 weeks", level: "Intermediate" },
+      { id: "modern-web-dev", title: "Modern Web Development", source: "Frontend Masters", modules: ["React 19", "TypeScript", "Next.js 15", "Tailwind CSS"], duration: "6 weeks", level: "Intermediate" },
+      { id: "ai-ml-basics", title: "AI & Machine Learning Basics", source: "fast.ai", modules: ["Python for ML", "Neural Networks", "LLM Fundamentals", "Prompt Engineering"], duration: "6 weeks", level: "Intermediate" }
     ]
   };
 }
@@ -477,183 +357,28 @@ function getFallbackPhase1(): { paths: any[] } {
 function getFallbackPhase2(): { projects: any[] } {
   return {
     projects: [
-      {
-        title: "AI-Powered Code Review Assistant",
-        description: "Build an intelligent code review tool that analyzes pull requests, suggests improvements, and learns from your codebase patterns using RAG architecture.",
-        techStack: ["Python", "LangChain", "FastAPI", "React", "PostgreSQL", "ChromaDB"],
-        features: [
-          "GitHub integration for PR analysis",
-          "AI-powered code suggestions",
-          "Custom coding standards enforcement",
-          "Learning from team feedback",
-          "Slack/Discord notifications"
-        ],
-        timeline: "5-6 weeks",
-        difficulty: "Advanced"
-      },
-      {
-        title: "Real-Time Collaborative Whiteboard",
-        description: "Create a Figma-like collaborative canvas with real-time cursors, shape tools, and AI-assisted diagram generation.",
-        techStack: ["Next.js 15", "TypeScript", "Supabase", "WebRTC", "Canvas API", "Framer Motion"],
-        features: [
-          "Real-time collaboration with cursors",
-          "Shape and drawing tools",
-          "AI diagram generation from text",
-          "Export to multiple formats",
-          "Team workspace management"
-        ],
-        timeline: "4-5 weeks",
-        difficulty: "Intermediate"
-      }
+      { title: "AI-Powered Code Review Assistant", description: "Build an intelligent code review tool using RAG architecture.", techStack: ["Python", "LangChain", "FastAPI", "React", "PostgreSQL"], features: ["GitHub integration", "AI suggestions", "Custom standards", "Team feedback", "Notifications"], timeline: "5-6 weeks", difficulty: "Advanced" },
+      { title: "Real-Time Collaborative Whiteboard", description: "Create a Figma-like collaborative canvas with real-time cursors.", techStack: ["Next.js 15", "TypeScript", "Supabase", "WebRTC", "Canvas API"], features: ["Real-time cursors", "Drawing tools", "AI diagrams", "Export", "Workspaces"], timeline: "4-5 weeks", difficulty: "Intermediate" }
     ]
   };
 }
 
 function getFallbackPhase3(): { sprints: any[], totalWeeks: number } {
   return {
-    totalWeeks: 24,
+    totalWeeks: 8,
     sprints: [
-      {
-        week: 1,
-        theme: "Week 1: Foundation & Environment Setup",
-        knowledgeStack: [
-          { title: "CS50's Introduction to Computer Science 2024", source: "Harvard", url: "https://cs50.harvard.edu/x/", type: "course", instructor: "David J. Malan" },
-          { title: "Git and GitHub for Beginners - Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=RGOj5yH7evk", type: "youtube", instructor: "freeCodeCamp.org" },
-          { title: "VS Code Tutorial for Beginners", source: "YouTube", url: "https://www.youtube.com/watch?v=VqCgcpAypFQ", type: "youtube", instructor: "Traversy Media" }
-        ],
-        forgeObjective: {
-          milestone: "Initialize project repository and development environment",
-          deliverables: ["Set up Git repository with proper .gitignore", "Configure VS Code with essential extensions", "Create initial project structure and README"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 1 Challenge: Foundation Setup",
-          description: "Weekly To-Do:\n1. Complete Git & GitHub crash course\n2. Set up VS Code development environment\n3. Initialize project repository with documentation"
-        }
-      },
-      {
-        week: 2,
-        theme: "Week 2: Core Language Mastery",
-        knowledgeStack: [
-          { title: "JavaScript Full Course for Beginners", source: "YouTube", url: "https://www.youtube.com/watch?v=PkZNo7MFNFg", type: "youtube", instructor: "freeCodeCamp.org" },
-          { title: "Python Programming MOOC 2024", source: "University of Helsinki", url: "https://programming-24.mooc.fi/", type: "course", instructor: "University of Helsinki" },
-          { title: "TypeScript Tutorial for Beginners", source: "YouTube", url: "https://www.youtube.com/watch?v=BwuLxPH8IDs", type: "youtube", instructor: "Academind" }
-        ],
-        forgeObjective: {
-          milestone: "Build core utility functions and data models",
-          deliverables: ["Implement data validation utilities", "Create TypeScript type definitions", "Write unit tests for utilities"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 2 Challenge: Core Language Skills",
-          description: "Weekly To-Do:\n1. Complete JavaScript/Python fundamentals\n2. Implement utility functions with TypeScript\n3. Set up Jest testing framework"
-        }
-      },
-      {
-        week: 3,
-        theme: "Week 3: API Design & Backend Foundations",
-        knowledgeStack: [
-          { title: "Node.js and Express.js Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=Oe421EPjeBE", type: "youtube", instructor: "freeCodeCamp.org" },
-          { title: "REST API Design Best Practices", source: "Microsoft Learn", url: "https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-design", type: "documentation" },
-          { title: "FastAPI Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=7t2alSnE2-I", type: "youtube", instructor: "freeCodeCamp.org" }
-        ],
-        forgeObjective: {
-          milestone: "Design and implement core API endpoints",
-          deliverables: ["Design database schema with ERD", "Implement RESTful CRUD endpoints", "Set up Swagger/OpenAPI documentation"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 3 Challenge: Backend Architecture",
-          description: "Weekly To-Do:\n1. Complete REST API course\n2. Implement database schema\n3. Build and test core endpoints"
-        }
-      },
-      {
-        week: 4,
-        theme: "Week 4: Authentication & Security",
-        knowledgeStack: [
-          { title: "JWT Authentication Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=mbsmsi7l3r4", type: "youtube", instructor: "Web Dev Simplified" },
-          { title: "OWASP Top 10 Security Risks", source: "OWASP", url: "https://owasp.org/www-project-top-ten/", type: "documentation" },
-          { title: "Node.js Authentication From Scratch", source: "YouTube", url: "https://www.youtube.com/watch?v=F-sFp_AvHc8", type: "youtube", instructor: "Traversy Media" }
-        ],
-        forgeObjective: {
-          milestone: "Implement secure authentication system",
-          deliverables: ["Implement JWT-based authentication", "Add password hashing with bcrypt", "Create protected API routes"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 4 Challenge: Security Implementation",
-          description: "Weekly To-Do:\n1. Complete JWT authentication tutorial\n2. Implement user registration & login\n3. Add route protection middleware"
-        }
-      },
-      {
-        week: 5,
-        theme: "Week 5: React Fundamentals & Component Architecture",
-        knowledgeStack: [
-          { title: "React Full Course 2024", source: "YouTube", url: "https://www.youtube.com/watch?v=bMknfKXIFA8", type: "youtube", instructor: "freeCodeCamp.org" },
-          { title: "React Official Tutorial", source: "React.dev", url: "https://react.dev/learn", type: "documentation" },
-          { title: "React Hooks Explained", source: "YouTube", url: "https://www.youtube.com/watch?v=TNhaISOUy6Q", type: "youtube", instructor: "Fireship" }
-        ],
-        forgeObjective: {
-          milestone: "Build reusable React component library",
-          deliverables: ["Create atomic UI components (Button, Input, Card)", "Implement component composition patterns", "Add Storybook documentation"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 5 Challenge: React Components",
-          description: "Weekly To-Do:\n1. Complete React fundamentals course\n2. Build 10+ reusable components\n3. Document components in Storybook"
-        }
-      },
-      {
-        week: 6,
-        theme: "Week 6: State Management & Data Fetching",
-        knowledgeStack: [
-          { title: "React Query (TanStack Query) Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=r8Dg0KVnfMA", type: "youtube", instructor: "Web Dev Simplified" },
-          { title: "Zustand State Management", source: "YouTube", url: "https://www.youtube.com/watch?v=fZPgBnL2x-Q", type: "youtube", instructor: "Fireship" },
-          { title: "Full Stack Open - State Management", source: "University of Helsinki", url: "https://fullstackopen.com/en/part6", type: "course", instructor: "University of Helsinki" }
-        ],
-        forgeObjective: {
-          milestone: "Implement global state and API integration",
-          deliverables: ["Set up TanStack Query for data fetching", "Implement Zustand for global state", "Add optimistic updates and caching"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 6 Challenge: State & Data",
-          description: "Weekly To-Do:\n1. Complete state management tutorials\n2. Integrate API with React Query\n3. Implement error handling and loading states"
-        }
-      },
-      {
-        week: 7,
-        theme: "Week 7: Database & Backend Integration",
-        knowledgeStack: [
-          { title: "PostgreSQL Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=qw--VYLpxG4", type: "youtube", instructor: "freeCodeCamp.org" },
-          { title: "Supabase Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=7uKQBl9uZ00", type: "youtube", instructor: "Traversy Media" },
-          { title: "Database Design Course", source: "MIT OCW", url: "https://ocw.mit.edu/courses/6-830-database-systems-fall-2010/", type: "course" }
-        ],
-        forgeObjective: {
-          milestone: "Complete database layer and real-time features",
-          deliverables: ["Design normalized database schema", "Implement database migrations", "Add real-time subscriptions"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 7 Challenge: Database Mastery",
-          description: "Weekly To-Do:\n1. Complete PostgreSQL fundamentals\n2. Set up Supabase backend\n3. Implement real-time data sync"
-        }
-      },
-      {
-        week: 8,
-        theme: "Week 8: Testing & Quality Assurance",
-        knowledgeStack: [
-          { title: "React Testing Library Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=7dTTFW7yACQ", type: "youtube", instructor: "freeCodeCamp.org" },
-          { title: "Jest Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=7r4xVDI2vho", type: "youtube", instructor: "Traversy Media" },
-          { title: "Testing JavaScript Applications", source: "The Odin Project", url: "https://www.theodinproject.com/lessons/node-path-javascript-testing-basics", type: "course" }
-        ],
-        forgeObjective: {
-          milestone: "Achieve 80%+ test coverage",
-          deliverables: ["Write unit tests for all utilities", "Add integration tests for API endpoints", "Implement E2E tests with Playwright"]
-        },
-        calendarEvent: {
-          summary: "[Hackwell] Week 8 Challenge: Testing Excellence",
-          description: "Weekly To-Do:\n1. Complete testing tutorials\n2. Write comprehensive test suite\n3. Set up CI/CD with test automation"
-        }
-      }
+      { week: 1, theme: "Week 1: Foundation & Environment Setup", knowledgeStack: [{ title: "CS50 Introduction", source: "Harvard", url: "https://cs50.harvard.edu/x/", type: "course", instructor: "David Malan" }, { title: "Git Crash Course", source: "YouTube", url: "https://www.youtube.com/watch?v=RGOj5yH7evk", type: "youtube", instructor: "freeCodeCamp" }], forgeObjective: { milestone: "Initialize project repository", deliverables: ["Set up Git repo", "Configure VS Code", "Create README"] }, calendarEvent: { summary: "[Hackwell] Week 1", description: "Git & environment setup" } },
+      { week: 2, theme: "Week 2: Core Language Mastery", knowledgeStack: [{ title: "JavaScript Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=PkZNo7MFNFg", type: "youtube", instructor: "freeCodeCamp" }], forgeObjective: { milestone: "Build utility functions", deliverables: ["Data validation", "Type definitions", "Unit tests"] }, calendarEvent: { summary: "[Hackwell] Week 2", description: "Language fundamentals" } },
+      { week: 3, theme: "Week 3: API Design & Backend", knowledgeStack: [{ title: "Node.js Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=Oe421EPjeBE", type: "youtube", instructor: "freeCodeCamp" }], forgeObjective: { milestone: "Implement core API", deliverables: ["Database schema", "CRUD endpoints", "API docs"] }, calendarEvent: { summary: "[Hackwell] Week 3", description: "Backend architecture" } },
+      { week: 4, theme: "Week 4: Authentication & Security", knowledgeStack: [{ title: "JWT Authentication", source: "YouTube", url: "https://www.youtube.com/watch?v=mbsmsi7l3r4", type: "youtube", instructor: "Web Dev Simplified" }], forgeObjective: { milestone: "Implement auth system", deliverables: ["JWT auth", "Password hashing", "Protected routes"] }, calendarEvent: { summary: "[Hackwell] Week 4", description: "Security implementation" } },
+      { week: 5, theme: "Week 5: React Fundamentals", knowledgeStack: [{ title: "React Full Course", source: "YouTube", url: "https://www.youtube.com/watch?v=bMknfKXIFA8", type: "youtube", instructor: "freeCodeCamp" }], forgeObjective: { milestone: "Build component library", deliverables: ["UI components", "Composition patterns", "Storybook docs"] }, calendarEvent: { summary: "[Hackwell] Week 5", description: "React components" } },
+      { week: 6, theme: "Week 6: State Management", knowledgeStack: [{ title: "React Query Tutorial", source: "YouTube", url: "https://www.youtube.com/watch?v=r8Dg0KVnfMA", type: "youtube", instructor: "Web Dev Simplified" }], forgeObjective: { milestone: "Implement global state", deliverables: ["TanStack Query", "Zustand state", "Optimistic updates"] }, calendarEvent: { summary: "[Hackwell] Week 6", description: "State & data" } },
+      { week: 7, theme: "Week 7: Database Integration", knowledgeStack: [{ title: "PostgreSQL Course", source: "YouTube", url: "https://www.youtube.com/watch?v=qw--VYLpxG4", type: "youtube", instructor: "freeCodeCamp" }], forgeObjective: { milestone: "Complete database layer", deliverables: ["Schema design", "Migrations", "Real-time sync"] }, calendarEvent: { summary: "[Hackwell] Week 7", description: "Database mastery" } },
+      { week: 8, theme: "Week 8: Testing & Deployment", knowledgeStack: [{ title: "React Testing Library", source: "YouTube", url: "https://www.youtube.com/watch?v=7dTTFW7yACQ", type: "youtube", instructor: "freeCodeCamp" }], forgeObjective: { milestone: "Achieve 80%+ test coverage", deliverables: ["Unit tests", "Integration tests", "CI/CD setup"] }, calendarEvent: { summary: "[Hackwell] Week 8", description: "Testing excellence" } }
     ]
   };
 }
 
-// Generate synthetic agent insights from Explore Mode data
 function buildExploreInsights(targetCareer: string, exploreAnswers: Record<string, string[]>): AgentInsights {
   const academicPosition = exploreAnswers.academic_position?.[0] || "student";
   const skillLevel = exploreAnswers.skill_level?.[0] || "beginner";
@@ -662,10 +387,10 @@ function buildExploreInsights(targetCareer: string, exploreAnswers: Record<strin
   const buildIdea = exploreAnswers.build_idea?.[0] || "a useful tool";
   
   return {
-    profiler: `User is a ${academicPosition} at ${skillLevel} level. Their work energy is in ${workEnergy}. They want to build: "${buildIdea}". Target career: ${targetCareer}.`,
-    pulse: `${targetCareer} roles are in high demand. Key trends include AI integration, cloud-native development, and real-time systems. Focus on modern tech stacks.`,
-    forge: `Recommended projects for ${targetCareer}: Build portfolio pieces that demonstrate ${workEnergy} skills. Start with fundamentals, then tackle real-world problems.`,
-    gatekeeper: `Constraints: ${constraints}. Risk mitigation: Start with core fundamentals before advanced topics. Build incrementally to avoid burnout.`
+    profiler: `User is a ${academicPosition} at ${skillLevel} level. Work energy: ${workEnergy}. Build idea: "${buildIdea}". Target: ${targetCareer}.`,
+    pulse: `${targetCareer} roles are in high demand. Focus on AI, cloud-native, and real-time systems.`,
+    forge: `Projects for ${targetCareer}: Build portfolio pieces demonstrating ${workEnergy} skills.`,
+    gatekeeper: `Constraints: ${constraints}. Start with fundamentals. Build incrementally.`
   };
 }
 
@@ -678,40 +403,36 @@ serve(async (req) => {
     const data: RequestData = await req.json();
     let { phase, agentInsights, targetCareer, exploreAnswers } = data;
 
-    // For Explore Mode: generate synthetic insights from explore answers
     if (!agentInsights && targetCareer && exploreAnswers) {
       agentInsights = buildExploreInsights(targetCareer, exploreAnswers);
       data.agentInsights = agentInsights;
     }
 
     if (!agentInsights) {
-      throw new Error("Agent insights are required (either from analysis or Explore Mode)");
+      throw new Error("Agent insights are required");
     }
 
     let result: any;
 
     if (phase === 1) {
-      const prompt = buildPhase1Prompt(data);
       try {
-        result = await callAI(prompt, PHASE1_TOOL);
+        result = await callAI(buildPhase1Prompt(data), PHASE1_TOOL);
       } catch (error) {
-        console.error("Phase 1 AI error, using fallback:", error);
+        console.error("Phase 1 AI error:", error);
         result = getFallbackPhase1();
       }
     } else if (phase === 2) {
-      const prompt = buildPhase2Prompt(data);
       try {
-        result = await callAI(prompt, PHASE2_TOOL);
+        result = await callAI(buildPhase2Prompt(data), PHASE2_TOOL);
       } catch (error) {
-        console.error("Phase 2 AI error, using fallback:", error);
+        console.error("Phase 2 AI error:", error);
         result = getFallbackPhase2();
       }
     } else if (phase === 3) {
-      const prompt = buildPhase3Prompt(data);
       try {
-        result = await callAI(prompt, PHASE3_TOOL);
+        result = await callAI(buildPhase3Prompt(data), PHASE3_TOOL);
       } catch (error) {
-        console.error("Phase 3 AI error, using fallback:", error);
+        console.error("Phase 3 AI error:", error);
         result = getFallbackPhase3();
       }
     } else {
@@ -722,13 +443,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error in generate-phase-content:", error);
+    console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
