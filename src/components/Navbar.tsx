@@ -1,29 +1,21 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Shield, LayoutDashboard } from "lucide-react";
+import { Menu, X, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const navLinks = [
     { name: "Features", href: "#features" },
     { name: "Roadmap", href: "#roadmap" },
     { name: "About", href: "#about" },
-    // Only show Dashboard link when user is logged in
-    ...(user ? [{ name: "Dashboard", href: "/dashboard", isRoute: true }] : []),
   ];
 
-  const scrollToSection = (href: string, isRoute?: boolean) => {
+  const scrollToSection = (href: string) => {
     setIsMenuOpen(false);
-    if (isRoute) {
-      navigate(href);
-      return;
-    }
     const element = document.querySelector(href);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -59,12 +51,9 @@ const Navbar = () => {
             {navLinks.map((link) => (
               <button
                 key={link.name}
-                onClick={() => scrollToSection(link.href, link.isRoute)}
-                className={`text-muted-foreground hover:text-foreground font-medium transition-colors duration-200 relative group ${
-                  link.isRoute ? "flex items-center gap-1.5" : ""
-                }`}
+                onClick={() => scrollToSection(link.href)}
+                className="text-muted-foreground hover:text-foreground font-medium transition-colors duration-200 relative group"
               >
-                {link.isRoute && <LayoutDashboard className="w-4 h-4" />}
                 {link.name}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-teal-500 transition-all duration-300 group-hover:w-full" />
               </button>
@@ -118,10 +107,9 @@ const Navbar = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  onClick={() => scrollToSection(link.href, link.isRoute)}
+                  onClick={() => scrollToSection(link.href)}
                   className="flex items-center gap-2 w-full text-left py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
                 >
-                  {link.isRoute && <LayoutDashboard className="w-4 h-4" />}
                   {link.name}
                 </motion.button>
               ))}
