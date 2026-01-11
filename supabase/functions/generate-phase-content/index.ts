@@ -5,6 +5,86 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ========== MULTI-MODEL FALLBACK CONFIGURATION ==========
+const MODEL_PRIORITY = [
+  "google/gemini-3-flash-preview",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite",
+  "google/gemini-2.5-pro",
+];
+
+interface ModelCallResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  statusCode?: number;
+  modelUsed?: string;
+}
+
+async function callWithModelFallback(
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+  options: {
+    tools?: any[];
+    tool_choice?: any;
+    max_tokens?: number;
+    temperature?: number;
+  } = {}
+): Promise<ModelCallResult> {
+  const { tools, tool_choice, max_tokens = 2000, temperature = 0.7 } = options;
+  
+  for (let i = 0; i < MODEL_PRIORITY.length; i++) {
+    const model = MODEL_PRIORITY[i];
+    console.log(`Attempting model ${i + 1}/${MODEL_PRIORITY.length}: ${model}`);
+    
+    try {
+      const body: any = { model, messages, max_tokens, temperature };
+      if (tools) body.tools = tools;
+      if (tool_choice) body.tool_choice = tool_choice;
+      
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      
+      if (response.status === 429) {
+        console.log(`Rate limited on ${model}, trying next model...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      
+      if (response.status === 402) {
+        return { success: false, error: "AI credits depleted.", statusCode: 402 };
+      }
+      
+      if (response.status >= 500) {
+        console.log(`Server error on ${model}, trying next...`);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        continue;
+      }
+      
+      if (!response.ok) {
+        console.error(`Error on ${model}: ${response.status}`);
+        continue;
+      }
+      
+      const data = await response.json();
+      console.log(`Success with model: ${model}`);
+      return { success: true, data, modelUsed: model };
+    } catch (error) {
+      console.error(`Exception on ${model}:`, error);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      continue;
+    }
+  }
+  
+  return { success: false, error: "All AI models unavailable.", statusCode: 503 };
+}
+
 interface AgentInsights {
   profiler: string;
   pulse: string;
@@ -335,42 +415,30 @@ async function callAI(systemPrompt: string, tool: ToolDefinition): Promise<any> 
     throw new Error("LOVABLE_API_KEY not configured");
   }
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: "You are an expert career advisor and project architect. Always use the provided tool to structure your response." },
-        { role: "user", content: systemPrompt }
-      ],
+  const result = await callWithModelFallback(
+    LOVABLE_API_KEY,
+    [
+      { role: "system", content: "You are an expert career advisor and project architect. Always use the provided tool to structure your response." },
+      { role: "user", content: systemPrompt }
+    ],
+    {
       tools: [tool],
-      tool_choice: { type: "function", function: { name: tool.function.name } }
-    }),
-  });
+      tool_choice: { type: "function", function: { name: tool.function.name } },
+      max_tokens: 4000,
+    }
+  );
 
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new Error("Rate limit exceeded. Please try again in a moment.");
-    }
-    if (response.status === 402) {
-      throw new Error("AI credits depleted. Please add credits to continue.");
-    }
-    const text = await response.text();
-    console.error("AI gateway error:", response.status, text);
-    throw new Error(`AI gateway error: ${response.status}`);
+  if (!result.success) {
+    throw new Error(result.error || "AI call failed");
   }
 
-  const result = await response.json();
-  const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
+  const toolCall = result.data.choices?.[0]?.message?.tool_calls?.[0];
   
   if (!toolCall) {
     throw new Error("No tool call in response");
   }
 
+  console.log(`AI call succeeded with model: ${result.modelUsed}`);
   return JSON.parse(toolCall.function.arguments);
 }
 

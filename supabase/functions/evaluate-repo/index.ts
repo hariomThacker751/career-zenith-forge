@@ -5,6 +5,86 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ========== MULTI-MODEL FALLBACK CONFIGURATION ==========
+const MODEL_PRIORITY = [
+  "google/gemini-3-flash-preview",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite",
+  "google/gemini-2.5-pro",
+];
+
+interface ModelCallResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  statusCode?: number;
+  modelUsed?: string;
+}
+
+async function callWithModelFallback(
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+  options: {
+    tools?: any[];
+    tool_choice?: any;
+    max_tokens?: number;
+    temperature?: number;
+  } = {}
+): Promise<ModelCallResult> {
+  const { tools, tool_choice, max_tokens = 1000, temperature = 0.7 } = options;
+  
+  for (let i = 0; i < MODEL_PRIORITY.length; i++) {
+    const model = MODEL_PRIORITY[i];
+    console.log(`Attempting model ${i + 1}/${MODEL_PRIORITY.length}: ${model}`);
+    
+    try {
+      const body: any = { model, messages, max_tokens, temperature };
+      if (tools) body.tools = tools;
+      if (tool_choice) body.tool_choice = tool_choice;
+      
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      
+      if (response.status === 429) {
+        console.log(`Rate limited on ${model}, trying next model...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      
+      if (response.status === 402) {
+        return { success: false, error: "AI credits depleted.", statusCode: 402 };
+      }
+      
+      if (response.status >= 500) {
+        console.log(`Server error on ${model}, trying next...`);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        continue;
+      }
+      
+      if (!response.ok) {
+        console.error(`Error on ${model}: ${response.status}`);
+        continue;
+      }
+      
+      const data = await response.json();
+      console.log(`Success with model: ${model}`);
+      return { success: true, data, modelUsed: model };
+    } catch (error) {
+      console.error(`Exception on ${model}:`, error);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      continue;
+    }
+  }
+  
+  return { success: false, error: "All AI models unavailable.", statusCode: 503 };
+}
+
 interface EvaluationRequest {
   githubUrl: string;
   weekNumber: number;
@@ -75,18 +155,13 @@ Evaluate the following aspects (score each 0-100):
 
 Provide your evaluation using the evaluate_repository function.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+    const result = await callWithModelFallback(
+      LOVABLE_API_KEY,
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      {
         tools: [
           {
             type: "function",
@@ -96,42 +171,22 @@ Provide your evaluation using the evaluate_repository function.`;
               parameters: {
                 type: "object",
                 properties: {
-                  passed: {
-                    type: "boolean",
-                    description: "Whether the project passes (true if overall score >= 70)",
-                  },
-                  score: {
-                    type: "number",
-                    description: "Overall score from 0-100",
-                  },
-                  feedback: {
-                    type: "string",
-                    description: "Brief 1-2 sentence summary of the evaluation",
-                  },
-                  strengths: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "3-5 specific things done well",
-                  },
-                  improvements: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "3-5 specific actionable improvements",
-                  },
+                  passed: { type: "boolean", description: "Whether the project passes (true if overall score >= 70)" },
+                  score: { type: "number", description: "Overall score from 0-100" },
+                  feedback: { type: "string", description: "Brief 1-2 sentence summary of the evaluation" },
+                  strengths: { type: "array", items: { type: "string" }, description: "3-5 specific things done well" },
+                  improvements: { type: "array", items: { type: "string" }, description: "3-5 specific actionable improvements" },
                   codeQuality: {
                     type: "object",
                     properties: {
-                      structure: { type: "number", description: "Score 0-100" },
-                      readability: { type: "number", description: "Score 0-100" },
-                      bestPractices: { type: "number", description: "Score 0-100" },
-                      documentation: { type: "number", description: "Score 0-100" },
+                      structure: { type: "number" },
+                      readability: { type: "number" },
+                      bestPractices: { type: "number" },
+                      documentation: { type: "number" },
                     },
                     required: ["structure", "readability", "bestPractices", "documentation"],
                   },
-                  professionalReview: {
-                    type: "string",
-                    description: "A 2-3 paragraph professional review as if from a senior engineer mentor",
-                  },
+                  professionalReview: { type: "string", description: "A 2-3 paragraph professional review" },
                 },
                 required: ["passed", "score", "feedback", "strengths", "improvements", "codeQuality", "professionalReview"],
               },
@@ -139,31 +194,21 @@ Provide your evaluation using the evaluate_repository function.`;
           },
         ],
         tool_choice: { type: "function", function: { name: "evaluate_repository" } },
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        max_tokens: 1500,
       }
-      if (response.status === 402) {
+    );
+
+    if (!result.success) {
+      if (result.statusCode === 402) {
         return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
+          JSON.stringify({ error: result.error }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error("AI evaluation failed");
+      throw new Error(result.error || "AI evaluation failed");
     }
 
-    const aiResponse = await response.json();
-    
-    // Extract the function call arguments
-    const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
+    const toolCall = result.data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall || toolCall.function.name !== "evaluate_repository") {
       throw new Error("Invalid AI response format");
     }
@@ -171,15 +216,13 @@ Provide your evaluation using the evaluate_repository function.`;
     const evaluation: EvaluationResult = JSON.parse(toolCall.function.arguments);
 
     return new Response(
-      JSON.stringify(evaluation),
+      JSON.stringify({ ...evaluation, modelUsed: result.modelUsed }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("evaluate-repo error:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : "Unknown error occurred" 
-      }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
