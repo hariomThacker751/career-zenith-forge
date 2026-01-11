@@ -19,12 +19,12 @@ class SecretManager {
   }
 
   private loadKeys(): void {
-    // Load all available Gemini API keys from environment
+    // Load all available Gemini API keys from environment variables
     const keyNames = [
-      "AIzaSyCxVDU2DtxNr8LtYog60yIXlaui4qQ-FZg",
-      "AIzaSyBUwwj97JrQz0MgCbhwxuxXE7dufNFkvoM",
-      "AIzaSyAVsR3zXmmNs6p78xeotcrlUGckwOb5c4g",
-      // "GEMINI_API_KEY_3",
+      "GEMINI_API_KEY",
+      "GEMINI_API_KEY_1",
+      "GEMINI_API_KEY_2",
+      "GEMINI_API_KEY_3",
     ];
 
     for (const keyName of keyNames) {
@@ -32,7 +32,7 @@ class SecretManager {
       if (key && key.trim() !== "") {
         this.keys.push(key);
         this.keyStats.set(key, {
-          key,
+          key: keyName, // Store the name for logging, not the actual key
           usageCount: 0,
           lastUsed: 0,
           rateLimitedUntil: 0,
