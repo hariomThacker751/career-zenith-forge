@@ -1,107 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callPerplexity, getPerplexityApiKey, PerplexityMessage } from "../_shared/perplexity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ========== GEMINI API DIRECT INTEGRATION ==========
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-2.5-flash-preview-05-20";
-
-interface GeminiMessage {
-  role: "user" | "model";
-  parts: Array<{ text: string }>;
-}
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{ text?: string; functionCall?: { name: string; args: any } }>;
-      role: string;
-    };
-    finishReason: string;
-  }>;
-}
-
-interface GeminiCallResult {
-  success: boolean;
-  text?: string;
-  toolCall?: { name: string; args: any };
-  error?: string;
-  statusCode?: number;
-}
-
-async function callGemini(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  options: { tools?: any[]; temperature?: number; maxOutputTokens?: number } = {}
-): Promise<GeminiCallResult> {
-  const { tools, temperature = 0.7, maxOutputTokens = 300 } = options;
-
-  const url = `${GEMINI_API_URL}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
-
-  const body: any = {
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: {
-      temperature,
-      maxOutputTokens,
-    },
-  };
-
-  if (tools && tools.length > 0) {
-    body.tools = [{
-      functionDeclarations: tools.map((t: any) => ({
-        name: t.function.name,
-        description: t.function.description,
-        parameters: t.function.parameters,
-      })),
-    }];
-    body.toolConfig = { functionCallingConfig: { mode: "ANY" } };
-  }
-
-  try {
-    console.log(`Calling Gemini: ${DEFAULT_MODEL}`);
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (response.status === 429) {
-      return { success: false, error: "Rate limit exceeded. Try again shortly.", statusCode: 429 };
-    }
-
-    if (response.status === 403) {
-      return { success: false, error: "Invalid GEMINI_API_KEY.", statusCode: 403 };
-    }
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`Gemini error: ${response.status} ${errText}`);
-      return { success: false, error: `API error: ${response.status}`, statusCode: response.status };
-    }
-
-    const data: GeminiResponse = await response.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-
-    const fnCall = parts.find((p) => p.functionCall);
-    if (fnCall?.functionCall) {
-      return { success: true, toolCall: { name: fnCall.functionCall.name, args: fnCall.functionCall.args } };
-    }
-
-    const textPart = parts.find((p) => p.text);
-    return { success: true, text: textPart?.text || "" };
-  } catch (error) {
-    console.error("Gemini call failed:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error", statusCode: 500 };
-  }
-}
-
-// ========== CAREER MAPPING TYPES & TOOLS ==========
+// ========== CAREER MAPPING TYPES ==========
 
 interface QuizAnswers {
   hobbies?: string[];
@@ -122,49 +27,13 @@ interface CareerPath {
   demandLevel: "High" | "Very High" | "Explosive";
 }
 
-const CAREER_MAPPING_TOOL = {
-  type: "function",
-  function: {
-    name: "map_careers",
-    description: "Analyze user's hobbies, interests, and skills to recommend top 3 career paths",
-    parameters: {
-      type: "object",
-      properties: {
-        careers: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              id: { type: "string", description: "Unique kebab-case identifier" },
-              title: { type: "string", description: "Career title" },
-              icon: { type: "string", enum: ["cpu", "palette", "server", "shield", "gamepad", "brain", "globe"] },
-              description: { type: "string", description: "2-3 sentence description" },
-              matchScore: { type: "number", description: "Match percentage 70-98" },
-              justification: { type: "string", description: "1-2 sentence explanation of WHY this matches their profile" },
-              keySkills: { 
-                type: "array", 
-                items: { type: "string" },
-                description: "5 key skills to master"
-              },
-              averageSalary: { type: "string", description: "Salary range like '$100,000 - $150,000'" },
-              demandLevel: { type: "string", enum: ["High", "Very High", "Explosive"] }
-            },
-            required: ["id", "title", "icon", "description", "matchScore", "justification", "keySkills", "averageSalary", "demandLevel"]
-          }
-        }
-      },
-      required: ["careers"]
-    }
-  }
-};
-
 function buildCareerMappingPrompt(answers: QuizAnswers): string {
   const hobbies = answers.hobbies?.join(", ") || "Not specified";
   const interests = answers.interests?.join(", ") || "Not specified";
   const skills = answers.skills?.join(", ") || "Not specified";
   const academics = answers.academics?.join(", ") || "Not specified";
 
-  return `Analyze the intersection of this user's profile to recommend TOP 3 career paths in tech.
+  return `Analyze this user's profile and recommend TOP 3 career paths in tech.
 
 ## USER PROFILE:
 - **Hobbies:** ${hobbies}
@@ -172,21 +41,24 @@ function buildCareerMappingPrompt(answers: QuizAnswers): string {
 - **Current Skills:** ${skills}
 - **Academic Background:** ${academics}
 
-## CAREER MAPPING LOGIC:
-1. Gaming + Logic/Math → Game Engine Dev, Backend Architect
-2. Gaming + Art → Game Designer, Technical Artist
-3. Art + Coding → Creative Technologist, Frontend Engineer
-4. Problem-solving + AI → ML Engineer, Data Scientist
-5. Writing + Coding → Technical Writer, Developer Relations
-6. FinTech + Math → Quant Developer, Blockchain Dev
-7. Systems + Coding → Backend Architect, DevOps Engineer
+Return a JSON object with this EXACT structure:
+{
+  "careers": [
+    {
+      "id": "kebab-case-id",
+      "title": "Career Title",
+      "icon": "cpu|palette|server|shield|gamepad|brain|globe",
+      "description": "2-3 sentence description",
+      "matchScore": 85,
+      "justification": "Why this matches their profile",
+      "keySkills": ["skill1", "skill2", "skill3", "skill4", "skill5"],
+      "averageSalary": "$100,000 - $150,000",
+      "demandLevel": "High|Very High|Explosive"
+    }
+  ]
+}
 
-## REQUIREMENTS:
-1. Return EXACTLY 3 career paths ranked by match score (highest first)
-2. Match scores: 70-98 (never 99-100)
-3. Justification MUST reference specific items from their profile
-4. Key skills = specific technologies
-5. Salary: realistic 2026 US market rates`;
+Match scores: 70-98. Return EXACTLY 3 careers.`;
 }
 
 function getFallbackCareers(answers: QuizAnswers): CareerPath[] {
@@ -228,9 +100,9 @@ function getFallbackCareers(answers: QuizAnswers): CareerPath[] {
 }
 
 async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> {
-  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-  if (!GEMINI_API_KEY) {
-    console.log("No GEMINI_API_KEY, using fallback careers");
+  const apiKey = getPerplexityApiKey();
+  if (!apiKey) {
+    console.log("No PERPLEXITY_API_KEY, using fallback careers");
     return new Response(
       JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -239,27 +111,35 @@ async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> 
 
   try {
     const prompt = buildCareerMappingPrompt(quizAnswers);
+    const messages: PerplexityMessage[] = [
+      { role: "system", content: "You are an expert career advisor. Return JSON only." },
+      { role: "user", content: prompt }
+    ];
 
-    const result = await callGemini(
-      GEMINI_API_KEY,
-      "You are an expert career advisor. Use the provided tool to structure your career recommendations.",
-      prompt,
-      { tools: [CAREER_MAPPING_TOOL], maxOutputTokens: 1000 }
-    );
+    const result = await callPerplexity(apiKey, messages, { maxTokens: 1000 });
 
     if (!result.success) {
-      console.log("AI call failed, using fallback careers");
+      console.log("Perplexity call failed, using fallback careers");
       return new Response(
         JSON.stringify({ careers: getFallbackCareers(quizAnswers), error: result.error }),
         { status: result.statusCode === 429 ? 429 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (result.toolCall) {
-      return new Response(
-        JSON.stringify({ careers: result.toolCall.args.careers }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Parse JSON from response
+    try {
+      const jsonMatch = result.text?.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.careers && Array.isArray(parsed.careers)) {
+          return new Response(
+            JSON.stringify({ careers: parsed.careers }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    } catch (e) {
+      console.log("JSON parse failed, using fallback");
     }
 
     return new Response(
@@ -285,10 +165,6 @@ const AGENT_PROMPTS = {
 ARCHETYPES: The Builder | The Analyst | The Innovator | The Optimizer | The Creator
 PATHS: Foundation Path (< 5 skills) | Precision Path (5+ skills)
 
-EXAMPLES:
-🎯 The Builder → Foundation Path • Master Python before building AI systems.
-🎯 The Innovator → Precision Path • Your ML stack is interview-ready.
-
 ONE LINE ONLY. No paragraphs.`,
 
   pulse: `You are THE PULSE. Provide 2026 market intel in EXACTLY this format (one line only):
@@ -296,27 +172,16 @@ ONE LINE ONLY. No paragraphs.`,
 📈 [Top Role] @ [Company] • Learn: [One Tech] • Gap: [One Skill]
 
 Use real companies: OpenAI, Anthropic, Stripe, Vercel, Google, Meta.
-Use real 2026 tech: Agentic AI, RAG, Next.js 15, Rust, Kubernetes.
 
-EXAMPLES:
-📈 MLOps Engineer @ Anthropic • Learn: LangGraph • Gap: System Design
-📈 Platform Engineer @ Vercel • Learn: Rust • Gap: Kubernetes
-
-ONE LINE ONLY. Dense value.`,
+ONE LINE ONLY.`,
 
   forge: `You are THE FORGE. Generate ONE project idea in EXACTLY this format (one line only):
 
 🔨 [Project Name] • [Tech Stack] • Ships in [X] weeks
 
-NO todo apps, NO blogs. Must be 2026-relevant (AI, real-time, or automation).
-Match to skill level: Beginner=CLI tools, Intermediate=Full-stack, Advanced=Distributed systems.
+NO todo apps. Must be 2026-relevant (AI, real-time, or automation).
 
-EXAMPLES:
-🔨 PR Sentinel • LangChain + GitHub API • Ships in 3 weeks
-🔨 Live Collab Editor • Next.js + WebSocket + GPT-4 • Ships in 4 weeks
-🔨 Green Energy Tracker • Playwright + PostgreSQL • Ships in 2 weeks
-
-ONE LINE ONLY. Make it memorable.`,
+ONE LINE ONLY.`,
 
   gatekeeper: `You are THE GATEKEEPER. Validate or warn in EXACTLY this format (one line only):
 
@@ -324,15 +189,7 @@ ONE LINE ONLY. Make it memorable.`,
 OR
 ✅ VALIDATED: [Success factor]
 
-RISKS: Time | Skill Gap | Burnout | Focus | Portfolio
-Be specific. Reference their actual data.
-
-EXAMPLES:
-⚠️ BURNOUT: 30+ hrs/week unsustainable → Schedule rest days.
-⚠️ SKILL GAP: Advanced goals with basic skills → 2 weeks on fundamentals first.
-✅ VALIDATED: Build in public for maximum recruiter visibility.
-
-ONE LINE ONLY. Be direct.`,
+ONE LINE ONLY.`,
 };
 
 interface AgentRequest {
@@ -360,69 +217,8 @@ function buildUserContext(data: AgentRequest): string {
 - Resume Projects: ${data.resumeProjects.length > 0 ? data.resumeProjects.join(", ") : "None"}
 - Experience: ${data.resumeExperience.length > 0 ? data.resumeExperience.join(", ") : "None"}
 
-Analyze this and respond in the EXACT format specified. ONE LINE ONLY.`;
+Respond in the EXACT format specified. ONE LINE ONLY.`;
 }
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const body = await req.json();
-
-    // Handle career mapping requests
-    if (body.quizAnswers) {
-      return handleCareerMapping(body.quizAnswers);
-    }
-
-    // Handle agent analysis requests
-    const { agentType, answers, resumeSkills, resumeProjects, resumeExperience }: AgentRequest = body;
-
-    if (!agentType || !AGENT_PROMPTS[agentType]) {
-      return new Response(
-        JSON.stringify({ error: "Invalid agent type" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY not configured", insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const systemPrompt = AGENT_PROMPTS[agentType];
-    const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
-
-    const result = await callGemini(
-      GEMINI_API_KEY,
-      systemPrompt,
-      userContext,
-      { maxOutputTokens: 150, temperature: 0.7 }
-    );
-
-    if (!result.success) {
-      return new Response(
-        JSON.stringify({ error: result.error, insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
-        { status: result.statusCode === 429 ? 429 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ insight: result.text || getFallbackAgentInsight(agentType, answers, resumeSkills) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (error) {
-    console.error("career-agents error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
 
 // Fallback insights
 function getFallbackAgentInsight(agentType: string, answers: Record<number, string>, resumeSkills: string[]): string {
@@ -454,3 +250,64 @@ function getFallbackAgentInsight(agentType: string, answers: Record<number, stri
       return "Analysis complete.";
   }
 }
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+
+    // Handle career mapping requests
+    if (body.quizAnswers) {
+      return handleCareerMapping(body.quizAnswers);
+    }
+
+    // Handle agent analysis requests
+    const { agentType, answers, resumeSkills, resumeProjects, resumeExperience }: AgentRequest = body;
+
+    if (!agentType || !AGENT_PROMPTS[agentType]) {
+      return new Response(
+        JSON.stringify({ error: "Invalid agent type" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const apiKey = getPerplexityApiKey();
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: "PERPLEXITY_API_KEY not configured", insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const systemPrompt = AGENT_PROMPTS[agentType];
+    const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
+
+    const messages: PerplexityMessage[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContext }
+    ];
+
+    const result = await callPerplexity(apiKey, messages, { maxTokens: 150, temperature: 0.3 });
+
+    if (!result.success) {
+      return new Response(
+        JSON.stringify({ error: result.error, insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
+        { status: result.statusCode === 429 ? 429 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ insight: result.text || getFallbackAgentInsight(agentType, answers, resumeSkills) }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("career-agents error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

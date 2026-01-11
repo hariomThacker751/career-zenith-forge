@@ -1,97 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callPerplexity, getPerplexityApiKey, PerplexityMessage } from "../_shared/perplexity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// ========== GEMINI API DIRECT INTEGRATION ==========
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-2.5-flash-preview-05-20";
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{ text?: string; functionCall?: { name: string; args: any } }>;
-      role: string;
-    };
-    finishReason: string;
-  }>;
-}
-
-interface GeminiCallResult {
-  success: boolean;
-  text?: string;
-  toolCall?: { name: string; args: any };
-  error?: string;
-  statusCode?: number;
-}
-
-async function callGemini(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  options: { tools?: any[]; maxOutputTokens?: number } = {}
-): Promise<GeminiCallResult> {
-  const { tools, maxOutputTokens = 4000 } = options;
-
-  const url = `${GEMINI_API_URL}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
-
-  const body: any = {
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { temperature: 0.7, maxOutputTokens },
-  };
-
-  if (tools && tools.length > 0) {
-    body.tools = [{
-      functionDeclarations: tools.map((t: any) => ({
-        name: t.function.name,
-        description: t.function.description,
-        parameters: t.function.parameters,
-      })),
-    }];
-    body.toolConfig = { functionCallingConfig: { mode: "ANY" } };
-  }
-
-  try {
-    console.log(`Calling Gemini: ${DEFAULT_MODEL}`);
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (response.status === 429) {
-      return { success: false, error: "Rate limit exceeded.", statusCode: 429 };
-    }
-
-    if (response.status === 403) {
-      return { success: false, error: "Invalid GEMINI_API_KEY.", statusCode: 403 };
-    }
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`Gemini error: ${response.status} ${errText}`);
-      return { success: false, error: `API error: ${response.status}`, statusCode: response.status };
-    }
-
-    const data: GeminiResponse = await response.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-
-    const fnCall = parts.find((p) => p.functionCall);
-    if (fnCall?.functionCall) {
-      return { success: true, toolCall: { name: fnCall.functionCall.name, args: fnCall.functionCall.args } };
-    }
-
-    const textPart = parts.find((p) => p.text);
-    return { success: true, text: textPart?.text || "" };
-  } catch (error) {
-    console.error("Gemini call failed:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error", statusCode: 500 };
-  }
-}
 
 interface AgentInsights {
   profiler: string;
@@ -117,145 +30,32 @@ interface RequestData {
   exploreAnswers?: Record<string, string[]>;
 }
 
-const PHASE1_TOOL = {
-  type: "function",
-  function: {
-    name: "generate_learning_paths",
-    description: "Generate 3-5 personalized learning paths based on skill gap analysis",
-    parameters: {
-      type: "object",
-      properties: {
-        paths: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              id: { type: "string" },
-              title: { type: "string" },
-              source: { type: "string" },
-              modules: { type: "array", items: { type: "string" } },
-              duration: { type: "string" },
-              level: { type: "string", enum: ["Beginner", "Intermediate", "Advanced"] }
-            },
-            required: ["id", "title", "source", "modules", "duration", "level"]
-          }
-        }
-      },
-      required: ["paths"]
-    }
-  }
-};
-
-const PHASE2_TOOL = {
-  type: "function",
-  function: {
-    name: "generate_projects",
-    description: "Generate 2-3 industry-relevant project PRDs",
-    parameters: {
-      type: "object",
-      properties: {
-        projects: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              title: { type: "string" },
-              description: { type: "string" },
-              techStack: { type: "array", items: { type: "string" } },
-              features: { type: "array", items: { type: "string" } },
-              timeline: { type: "string" },
-              difficulty: { type: "string", enum: ["Intermediate", "Advanced"] }
-            },
-            required: ["title", "description", "techStack", "features", "timeline", "difficulty"]
-          }
-        }
-      },
-      required: ["projects"]
-    }
-  }
-};
-
-const PHASE3_TOOL = {
-  type: "function",
-  function: {
-    name: "generate_weekly_sprints",
-    description: "Generate 8 weekly sprints with learning resources",
-    parameters: {
-      type: "object",
-      properties: {
-        sprints: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              week: { type: "number" },
-              theme: { type: "string" },
-              knowledgeStack: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    title: { type: "string" },
-                    source: { type: "string" },
-                    url: { type: "string" },
-                    type: { type: "string", enum: ["youtube", "course", "documentation", "tutorial", "repository"] },
-                    instructor: { type: "string" }
-                  },
-                  required: ["title", "source", "url", "type"]
-                }
-              },
-              forgeObjective: {
-                type: "object",
-                properties: {
-                  milestone: { type: "string" },
-                  deliverables: { type: "array", items: { type: "string" } }
-                },
-                required: ["milestone", "deliverables"]
-              },
-              calendarEvent: {
-                type: "object",
-                properties: {
-                  summary: { type: "string" },
-                  description: { type: "string" }
-                },
-                required: ["summary", "description"]
-              }
-            },
-            required: ["week", "theme", "knowledgeStack", "forgeObjective", "calendarEvent"]
-          }
-        },
-        totalWeeks: { type: "number" }
-      },
-      required: ["sprints", "totalWeeks"]
-    }
-  }
-};
-
 function buildPhase1Prompt(data: RequestData): string {
   const targetCareerSection = data.targetCareer 
     ? `TARGET CAREER: ${data.targetCareer}. All paths MUST be specifically tailored for ${data.targetCareer}.`
     : "";
 
-  return `Generate 3-5 personalized learning paths.
+  return `Generate 3-5 personalized learning paths as JSON.
 ${targetCareerSection}
 
 ## Agent Insights:
 - PROFILER: ${data.agentInsights.profiler}
 - PULSE: ${data.agentInsights.pulse}
-- GATEKEEPER: ${data.agentInsights.gatekeeper}
 
 ## User Profile:
 - Year: ${data.answers[0] || "Not specified"}
 - Interest: ${data.answers[1] || "Not specified"}
 - Skill Level: ${data.answers[2] || "Not specified"}
-- Hours/Week: ${data.answers[3] || "Not specified"}
 - Skills: ${data.resumeSkills.join(", ") || "None"}
 
-Requirements:
-1. Address specific skill gaps
-2. Use real courses (Coursera, edX, Udemy, fast.ai)
-3. Order by priority
-4. Match difficulty to skill level`;
+Return JSON:
+{
+  "paths": [
+    {"id": "path-id", "title": "Path Title", "source": "Course Provider", "modules": ["Module 1", "Module 2"], "duration": "X weeks", "level": "Beginner|Intermediate|Advanced"}
+  ]
+}
+
+Use real courses: Coursera, edX, Udemy, fast.ai, freeCodeCamp.`;
 }
 
 function buildPhase2Prompt(data: RequestData): string {
@@ -263,7 +63,7 @@ function buildPhase2Prompt(data: RequestData): string {
     ? `TARGET CAREER: ${data.targetCareer}. Projects must be portfolio pieces for ${data.targetCareer} roles.`
     : "";
 
-  return `Generate 2-3 high-impact, 2026-relevant project ideas.
+  return `Generate 2-3 high-impact project ideas as JSON.
 ${targetCareerSection}
 
 ## Agent Insights:
@@ -276,11 +76,14 @@ ${targetCareerSection}
 - Skills: ${data.resumeSkills.join(", ") || "None"}
 - Learning Paths: ${data.selectedLearningPaths?.join(", ") || "None"}
 
-Requirements:
-1. NO todo apps, weather apps, or basic CRUD
-2. Solve REAL problems
-3. Modern 2024-2026 tech stacks (AI, real-time)
-4. Completable in 4-8 weeks`;
+Return JSON:
+{
+  "projects": [
+    {"title": "Project Name", "description": "Description", "techStack": ["tech1", "tech2"], "features": ["feature1", "feature2"], "timeline": "X weeks", "difficulty": "Intermediate|Advanced"}
+  ]
+}
+
+NO todo apps. Modern 2024-2026 tech (AI, real-time). Completable in 4-8 weeks.`;
 }
 
 function buildPhase3Prompt(data: RequestData): string {
@@ -289,7 +92,7 @@ function buildPhase3Prompt(data: RequestData): string {
     ? `TARGET CAREER: ${data.targetCareer}. Roadmap for landing a job as ${data.targetCareer}.`
     : "";
 
-  return `Create 8 weekly sprints with THE BEST free learning resources.
+  return `Create 8 weekly sprints with THE BEST free learning resources as JSON.
 ${targetCareerSection}
 
 ## Target Project:
@@ -298,49 +101,52 @@ ${targetCareerSection}
 - Difficulty: ${project?.difficulty || "Unknown"}
 
 ## User Profile:
-- Year: ${data.answers[0]}
 - Skill Level: ${data.answers[2]}
 - Hours/Week: ${data.answers[3] || "10-15"}
-- Skills: ${data.resumeSkills?.join(", ") || "Not specified"}
+- Skills: ${data.resumeSkills?.join(", ") || "None"}
 
-## VERIFIED YOUTUBE CHANNELS (use these):
-- Traversy Media, Fireship, Net Ninja, freeCodeCamp.org, Web Dev Simplified, Academind
+## VERIFIED RESOURCES (use these):
+- YouTube: Traversy Media, Fireship, Net Ninja, freeCodeCamp.org, Web Dev Simplified
+- Courses: CS50, Full Stack Open, The Odin Project
 
-## VERIFIED COURSES (use these):
-- CS50: https://cs50.harvard.edu/x/
-- Full Stack Open: https://fullstackopen.com/en/
-- The Odin Project: https://www.theodinproject.com/
-
-Each week needs: theme, 2-3 knowledge stack resources, forge objective with 3 deliverables, calendar event.`;
+Return JSON:
+{
+  "sprints": [
+    {
+      "week": 1,
+      "theme": "Week 1: Theme Title",
+      "knowledgeStack": [{"title": "Resource", "source": "Provider", "url": "https://...", "type": "youtube|course|documentation", "instructor": "Name"}],
+      "forgeObjective": {"milestone": "Milestone", "deliverables": ["Task 1", "Task 2", "Task 3"]},
+      "calendarEvent": {"summary": "[Hackwell] Week 1", "description": "Description"}
+    }
+  ],
+  "totalWeeks": 8
+}`;
 }
 
-interface ToolDefinition {
-  type: string;
-  function: { name: string; description: string; parameters: object };
-}
-
-async function callAI(systemPrompt: string, tool: ToolDefinition): Promise<any> {
-  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY not configured");
+async function callAI(prompt: string): Promise<any> {
+  const apiKey = getPerplexityApiKey();
+  if (!apiKey) {
+    throw new Error("PERPLEXITY_API_KEY not configured");
   }
 
-  const result = await callGemini(
-    GEMINI_API_KEY,
-    "You are an expert career advisor and project architect. Always use the provided tool to structure your response.",
-    systemPrompt,
-    { tools: [tool], maxOutputTokens: 4000 }
-  );
+  const messages: PerplexityMessage[] = [
+    { role: "system", content: "You are an expert career advisor. Return JSON only, no markdown." },
+    { role: "user", content: prompt }
+  ];
+
+  const result = await callPerplexity(apiKey, messages, { maxTokens: 3000 });
 
   if (!result.success) {
     throw new Error(result.error || "AI call failed");
   }
 
-  if (!result.toolCall) {
-    throw new Error("No tool call in response");
+  const jsonMatch = result.text?.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("No JSON in response");
   }
 
-  return result.toolCall.args;
+  return JSON.parse(jsonMatch[0]);
 }
 
 // Fallback content
@@ -416,34 +222,35 @@ serve(async (req) => {
 
     if (phase === 1) {
       try {
-        result = await callAI(buildPhase1Prompt(data), PHASE1_TOOL);
+        result = await callAI(buildPhase1Prompt(data));
       } catch (error) {
         console.error("Phase 1 AI error:", error);
         result = getFallbackPhase1();
       }
     } else if (phase === 2) {
       try {
-        result = await callAI(buildPhase2Prompt(data), PHASE2_TOOL);
+        result = await callAI(buildPhase2Prompt(data));
       } catch (error) {
         console.error("Phase 2 AI error:", error);
         result = getFallbackPhase2();
       }
     } else if (phase === 3) {
       try {
-        result = await callAI(buildPhase3Prompt(data), PHASE3_TOOL);
+        result = await callAI(buildPhase3Prompt(data));
       } catch (error) {
         console.error("Phase 3 AI error:", error);
         result = getFallbackPhase3();
       }
     } else {
-      throw new Error("Invalid phase number");
+      throw new Error("Invalid phase");
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify(result),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
-    console.error("Error:", error);
+    console.error("generate-phase-content error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
