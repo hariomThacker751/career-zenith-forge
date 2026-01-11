@@ -2,6 +2,7 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import LandingHero from "@/components/LandingHero";
 import FeaturesSection from "@/components/FeaturesSection";
+import RoadmapSection from "@/components/RoadmapSection";
 import AboutSection from "@/components/AboutSection";
 import DiagnosticFlow from "@/components/DiagnosticFlow";
 import ResumeSyncBadge from "@/components/ResumeSyncBadge";
@@ -36,6 +37,9 @@ const Index = () => {
           
           {/* Features Section */}
           <FeaturesSection />
+          
+          {/* Roadmap Section */}
+          <RoadmapSection />
           
           {/* About Section */}
           <AboutSection />
