@@ -11,11 +11,16 @@ const Navbar = () => {
   const navLinks = [
     { name: "Features", href: "#features" },
     { name: "Roadmap", href: "#roadmap" },
+    { name: "Pricing", href: "/pricing", isRoute: true },
     { name: "About", href: "#about" },
   ];
 
-  const scrollToSection = (href: string) => {
+  const scrollToSection = (href: string, isRoute?: boolean) => {
     setIsMenuOpen(false);
+    if (isRoute) {
+      navigate(href);
+      return;
+    }
     const element = document.querySelector(href);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -51,7 +56,7 @@ const Navbar = () => {
             {navLinks.map((link) => (
               <button
                 key={link.name}
-                onClick={() => scrollToSection(link.href)}
+                onClick={() => scrollToSection(link.href, link.isRoute)}
                 className="text-muted-foreground hover:text-foreground font-medium transition-colors duration-200 relative group"
               >
                 {link.name}
@@ -107,7 +112,7 @@ const Navbar = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  onClick={() => scrollToSection(link.href)}
+                  onClick={() => scrollToSection(link.href, link.isRoute)}
                   className="flex items-center gap-2 w-full text-left py-2 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
                 >
                   {link.name}
