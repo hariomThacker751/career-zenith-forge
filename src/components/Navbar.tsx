@@ -10,6 +10,7 @@ const Navbar = () => {
   const location = useLocation();
 
   const navLinks = [
+    { name: "Home", href: "/", isRoute: true },
     { name: "Features", href: "#features" },
     { name: "Roadmap", href: "#roadmap" },
     { name: "Pricing", href: "/pricing", isRoute: true },
