@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ResumeProvider } from "@/contexts/ResumeContext";
 import { PhaseProvider } from "@/contexts/PhaseContext";
+import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -27,6 +28,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <ScrollToTop />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
