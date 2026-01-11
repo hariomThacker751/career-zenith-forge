@@ -90,7 +90,7 @@ const Navbar = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Button 
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/auth")}
               className="bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-semibold px-6 shadow-lg shadow-teal-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-teal-500/30"
             >
               Get Started
@@ -142,7 +142,7 @@ const Navbar = () => {
                 className="pt-2"
               >
                 <Button 
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => navigate("/auth")}
                   className="w-full bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-semibold shadow-lg"
                 >
                   Get Started
