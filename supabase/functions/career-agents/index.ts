@@ -1,10 +1,89 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callPerplexity, getPerplexityApiKey, PerplexityMessage } from "../_shared/perplexity.ts";
+import { getNextGeminiKey, rotateOnRateLimit, getSecretManager } from "../_shared/secretManager.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// ========== GEMINI API CALL ==========
+
+interface GeminiResponse {
+  success: boolean;
+  text?: string;
+  error?: string;
+}
+
+async function callGeminiDirect(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+  maxRetries: number = 2
+): Promise<GeminiResponse> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: userPrompt }]
+            }
+          ],
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 200,
+          }
+        }),
+      });
+
+      if (response.status === 429) {
+        console.log(`Gemini rate limited on attempt ${attempt + 1}, rotating key...`);
+        // Try to rotate to next key
+        try {
+          const newKey = rotateOnRateLimit(apiKey);
+          if (newKey !== apiKey && attempt < maxRetries) {
+            apiKey = newKey;
+            continue;
+          }
+        } catch (e) {
+          console.log("No more keys available for rotation");
+        }
+        return { success: false, error: "Rate limited" };
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Gemini error: ${response.status} - ${errorText}`);
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (text) {
+        return { success: true, text: text.trim() };
+      }
+
+      return { success: false, error: "No content in response" };
+    } catch (error) {
+      console.error(`Gemini call failed on attempt ${attempt + 1}:`, error);
+      if (attempt === maxRetries) {
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+      }
+    }
+  }
+
+  return { success: false, error: "Max retries exceeded" };
+}
 
 // ========== CAREER MAPPING TYPES ==========
 
@@ -100,9 +179,40 @@ function getFallbackCareers(answers: QuizAnswers): CareerPath[] {
 }
 
 async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> {
+  // Try Gemini first (has key rotation)
+  const secretManager = getSecretManager();
+  if (secretManager.hasKeys()) {
+    try {
+      const apiKey = getNextGeminiKey();
+      const prompt = buildCareerMappingPrompt(quizAnswers);
+      const result = await callGeminiDirect(
+        apiKey,
+        "You are an expert career advisor. Return JSON only, no markdown.",
+        prompt
+      );
+
+      if (result.success && result.text) {
+        const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.careers && Array.isArray(parsed.careers)) {
+            return new Response(
+              JSON.stringify({ careers: parsed.careers }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+      }
+      console.log("Gemini career mapping failed, trying Perplexity...");
+    } catch (e) {
+      console.log("Gemini error:", e);
+    }
+  }
+
+  // Fallback to Perplexity
   const apiKey = getPerplexityApiKey();
   if (!apiKey) {
-    console.log("No PERPLEXITY_API_KEY, using fallback careers");
+    console.log("No API keys available, using fallback careers");
     return new Response(
       JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -126,7 +236,6 @@ async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> 
       );
     }
 
-    // Parse JSON from response
     try {
       const jsonMatch = result.text?.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -274,10 +383,34 @@ serve(async (req) => {
       );
     }
 
+    // Try Gemini first (has key rotation for rate limits)
+    const secretManager = getSecretManager();
+    if (secretManager.hasKeys()) {
+      try {
+        const geminiKey = getNextGeminiKey();
+        const systemPrompt = AGENT_PROMPTS[agentType];
+        const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
+
+        const result = await callGeminiDirect(geminiKey, systemPrompt, userContext);
+
+        if (result.success && result.text) {
+          console.log(`Gemini success for ${agentType}`);
+          return new Response(
+            JSON.stringify({ insight: result.text }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        console.log(`Gemini failed for ${agentType}, falling back...`);
+      } catch (e) {
+        console.log(`Gemini error for ${agentType}:`, e);
+      }
+    }
+
+    // Fallback to Perplexity
     const apiKey = getPerplexityApiKey();
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "PERPLEXITY_API_KEY not configured", insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
+        JSON.stringify({ insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
