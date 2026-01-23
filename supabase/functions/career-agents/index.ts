@@ -1,88 +1,75 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callPerplexity, getPerplexityApiKey, PerplexityMessage } from "../_shared/perplexity.ts";
-import { getNextGeminiKey, rotateOnRateLimit, getSecretManager } from "../_shared/secretManager.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ========== GEMINI API CALL ==========
+// ========== LOVABLE AI CALL ==========
 
-interface GeminiResponse {
+interface LovableAIResponse {
   success: boolean;
   text?: string;
   error?: string;
 }
 
-async function callGeminiDirect(
-  apiKey: string,
+async function callLovableAI(
   systemPrompt: string,
-  userPrompt: string,
-  maxRetries: number = 2
-): Promise<GeminiResponse> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: userPrompt }]
-            }
-          ],
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
-          },
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 200,
-          }
-        }),
-      });
-
-      if (response.status === 429) {
-        console.log(`Gemini rate limited on attempt ${attempt + 1}, rotating key...`);
-        // Try to rotate to next key
-        try {
-          const newKey = rotateOnRateLimit(apiKey);
-          if (newKey !== apiKey && attempt < maxRetries) {
-            apiKey = newKey;
-            continue;
-          }
-        } catch (e) {
-          console.log("No more keys available for rotation");
-        }
-        return { success: false, error: "Rate limited" };
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Gemini error: ${response.status} - ${errorText}`);
-        return { success: false, error: `API error: ${response.status}` };
-      }
-
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (text) {
-        return { success: true, text: text.trim() };
-      }
-
-      return { success: false, error: "No content in response" };
-    } catch (error) {
-      console.error(`Gemini call failed on attempt ${attempt + 1}:`, error);
-      if (attempt === maxRetries) {
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-      }
-    }
+  userPrompt: string
+): Promise<LovableAIResponse> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  if (!LOVABLE_API_KEY) {
+    console.error("LOVABLE_API_KEY not configured");
+    return { success: false, error: "API key not configured" };
   }
 
-  return { success: false, error: "Max retries exceeded" };
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 300,
+      }),
+    });
+
+    if (response.status === 429) {
+      console.error("Lovable AI rate limited");
+      return { success: false, error: "Rate limit exceeded. Please try again in a moment." };
+    }
+
+    if (response.status === 402) {
+      console.error("Lovable AI payment required");
+      return { success: false, error: "Payment required. Please add credits." };
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Lovable AI error: ${response.status} - ${errorText}`);
+      return { success: false, error: `API error: ${response.status}` };
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content;
+
+    if (text) {
+      return { success: true, text: text.trim() };
+    }
+
+    return { success: false, error: "No content in response" };
+  } catch (error) {
+    console.error("Lovable AI call failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
 }
 
 // ========== CAREER MAPPING TYPES ==========
@@ -179,65 +166,15 @@ function getFallbackCareers(answers: QuizAnswers): CareerPath[] {
 }
 
 async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> {
-  // Try Gemini first (has key rotation)
-  const secretManager = getSecretManager();
-  if (secretManager.hasKeys()) {
+  const prompt = buildCareerMappingPrompt(quizAnswers);
+  const result = await callLovableAI(
+    "You are an expert career advisor. Return JSON only, no markdown.",
+    prompt
+  );
+
+  if (result.success && result.text) {
     try {
-      const apiKey = getNextGeminiKey();
-      const prompt = buildCareerMappingPrompt(quizAnswers);
-      const result = await callGeminiDirect(
-        apiKey,
-        "You are an expert career advisor. Return JSON only, no markdown.",
-        prompt
-      );
-
-      if (result.success && result.text) {
-        const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (parsed.careers && Array.isArray(parsed.careers)) {
-            return new Response(
-              JSON.stringify({ careers: parsed.careers }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-        }
-      }
-      console.log("Gemini career mapping failed, trying Perplexity...");
-    } catch (e) {
-      console.log("Gemini error:", e);
-    }
-  }
-
-  // Fallback to Perplexity
-  const apiKey = getPerplexityApiKey();
-  if (!apiKey) {
-    console.log("No API keys available, using fallback careers");
-    return new Response(
-      JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  try {
-    const prompt = buildCareerMappingPrompt(quizAnswers);
-    const messages: PerplexityMessage[] = [
-      { role: "system", content: "You are an expert career advisor. Return JSON only." },
-      { role: "user", content: prompt }
-    ];
-
-    const result = await callPerplexity(apiKey, messages, { maxTokens: 1000 });
-
-    if (!result.success) {
-      console.log("Perplexity call failed, using fallback careers");
-      return new Response(
-        JSON.stringify({ careers: getFallbackCareers(quizAnswers), error: result.error }),
-        { status: result.statusCode === 429 ? 429 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    try {
-      const jsonMatch = result.text?.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.careers && Array.isArray(parsed.careers)) {
@@ -250,18 +187,14 @@ async function handleCareerMapping(quizAnswers: QuizAnswers): Promise<Response> 
     } catch (e) {
       console.log("JSON parse failed, using fallback");
     }
-
-    return new Response(
-      JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (error) {
-    console.error("Career mapping error:", error);
-    return new Response(
-      JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   }
+
+  // Return fallback careers if AI fails
+  console.log("AI career mapping failed, using fallback careers");
+  return new Response(
+    JSON.stringify({ careers: getFallbackCareers(quizAnswers) }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 
 // ========== AGENT PROMPTS (Concise one-liners) ==========
@@ -383,58 +316,24 @@ serve(async (req) => {
       );
     }
 
-    // Try Gemini first (has key rotation for rate limits)
-    const secretManager = getSecretManager();
-    if (secretManager.hasKeys()) {
-      try {
-        const geminiKey = getNextGeminiKey();
-        const systemPrompt = AGENT_PROMPTS[agentType];
-        const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
-
-        const result = await callGeminiDirect(geminiKey, systemPrompt, userContext);
-
-        if (result.success && result.text) {
-          console.log(`Gemini success for ${agentType}`);
-          return new Response(
-            JSON.stringify({ insight: result.text }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        console.log(`Gemini failed for ${agentType}, falling back...`);
-      } catch (e) {
-        console.log(`Gemini error for ${agentType}:`, e);
-      }
-    }
-
-    // Fallback to Perplexity
-    const apiKey = getPerplexityApiKey();
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const systemPrompt = AGENT_PROMPTS[agentType];
     const userContext = buildUserContext({ agentType, answers, resumeSkills, resumeProjects, resumeExperience });
 
-    const messages: PerplexityMessage[] = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userContext }
-    ];
+    const result = await callLovableAI(systemPrompt, userContext);
 
-    const result = await callPerplexity(apiKey, messages, { maxTokens: 150, temperature: 0.3 });
-
-    if (!result.success) {
+    if (result.success && result.text) {
+      console.log(`Lovable AI success for ${agentType}`);
       return new Response(
-        JSON.stringify({ error: result.error, insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
-        { status: result.statusCode === 429 ? 429 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ insight: result.text }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Return fallback insight if AI fails
+    console.log(`AI failed for ${agentType}, using fallback`);
     return new Response(
-      JSON.stringify({ insight: result.text || getFallbackAgentInsight(agentType, answers, resumeSkills) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ insight: getFallbackAgentInsight(agentType, answers, resumeSkills) }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("career-agents error:", error);
